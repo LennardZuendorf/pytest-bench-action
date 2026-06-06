@@ -1,0 +1,398 @@
+name: pytest-bench-action
+description: Run pytest-benchmark, manage per-branch baselines, and post PR comparison comments.
+author: lennardzuendorf
+
+inputs:
+  python-version:
+    description: Python version for consistent benchmarks
+    required: false
+    default: "3.14"
+  benchmark-run-command:
+    description: Full shell command to run benchmarks (must write --benchmark-json output)
+    required: true
+  setup-command:
+    description: Shell command to install dependencies before running
+    required: false
+    default: ""
+  pre-benchmark-command:
+    description: Optional warm-up command run after deps install
+    required: false
+    default: ""
+  benchmark-results-file:
+    description: Path to the JSON output from pytest-benchmark
+    required: false
+    default: benchmark-results.json
+  cross-branch-tolerance:
+    description: "% increase allowed vs main branch baseline before failing"
+    required: false
+    default: "20"
+  update-tolerance:
+    description: "% change threshold that triggers a baseline update commit"
+    required: false
+    default: "5"
+  baselines-dir:
+    description: Repo-relative path where baseline JSONs are stored
+    required: false
+    default: .benchmarks/baselines
+  github-token:
+    description: GitHub token with contents:write and pull-requests:write
+    required: true
+  threshold-map:
+    description: >
+      JSON string mapping test name substrings to max-seconds thresholds.
+      e.g. {"e2e_create": 30.0, "help": 0.5}. Empty string defaults all tests to 1.0s.
+    required: false
+    default: ""
+
+outputs:
+  regression-detected:
+    description: '"true" if any regression was detected'
+    value: ${{ steps.set-outputs.outputs.regression-detected }}
+  baseline-updated:
+    description: '"true" if the baseline was updated and committed'
+    value: ${{ steps.set-outputs.outputs.baseline-updated }}
+  node:
+    description: Hostname extracted from machine_info.node in the results JSON
+    value: ${{ steps.extract-node.outputs.node }}
+
+runs:
+  using: composite
+  steps:
+    - name: Checkout
+      uses: actions/checkout@v4
+      with:
+        fetch-depth: 2
+        token: ${{ inputs.github-token }}
+
+    - name: Fetch target branch (PR only)
+      if: github.event_name == 'pull_request'
+      shell: bash
+      run: git fetch origin ${{ github.base_ref }} --depth=1
+
+    - name: Set up Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: ${{ inputs.python-version }}
+
+    - name: Install dependencies
+      if: inputs.setup-command != ''
+      shell: bash
+      run: ${{ inputs.setup-command }}
+
+    - name: Pre-benchmark warm-up
+      if: inputs.pre-benchmark-command != ''
+      shell: bash
+      run: ${{ inputs.pre-benchmark-command }}
+
+    - name: Prepare baselines directory
+      shell: bash
+      run: mkdir -p "${{ inputs.baselines-dir }}"
+
+    - name: Determine current branch
+      shell: bash
+      id: branch
+      run: |
+        if [ "${{ github.event_name }}" = "pull_request" ]; then
+          CURRENT_BRANCH="${{ github.head_ref }}"
+        else
+          CURRENT_BRANCH="${GITHUB_REF#refs/heads/}"
+        fi
+        echo "current_branch=${CURRENT_BRANCH}" >> "$GITHUB_OUTPUT"
+        # Sanitize: replace /, \, space, . with _
+        SANITIZED=$(echo "${CURRENT_BRANCH}" | tr '/\\. ' '_')
+        echo "sanitized_branch=${SANITIZED}" >> "$GITHUB_OUTPUT"
+
+    - name: Load cross-branch baseline (PR only)
+      if: github.event_name == 'pull_request'
+      shell: bash
+      id: load-main-baseline
+      run: |
+        TARGET_BRANCH="${{ github.base_ref }}"
+        SANITIZED_TARGET=$(echo "${TARGET_BRANCH}" | tr '/\\. ' '_')
+        BASELINE_PATH="${{ inputs.baselines-dir }}/main.json"
+
+        git show "origin/${TARGET_BRANCH}:${{ inputs.baselines-dir }}/${SANITIZED_TARGET}.json" \
+          > "${BASELINE_PATH}" 2>/dev/null || true
+
+        if [ -s "${BASELINE_PATH}" ]; then
+          echo "main_baseline_exists=true" >> "$GITHUB_OUTPUT"
+          echo "main_baseline_path=${BASELINE_PATH}" >> "$GITHUB_OUTPUT"
+        else
+          echo "main_baseline_exists=false" >> "$GITHUB_OUTPUT"
+          rm -f "${BASELINE_PATH}"
+          echo "No main branch baseline found — skipping cross-branch comparison."
+        fi
+
+    - name: Load previous-commit baseline
+      shell: bash
+      id: load-prev-baseline
+      run: |
+        CURRENT_BRANCH="${{ steps.branch.outputs.current_branch }}"
+        SANITIZED="${{ steps.branch.outputs.sanitized_branch }}"
+
+        # Avoid overwriting main.json when on the main branch
+        if [ "${SANITIZED}" = "main" ]; then
+          LOCAL_FILE="${{ inputs.baselines-dir }}/main_previous.json"
+        else
+          LOCAL_FILE="${{ inputs.baselines-dir }}/${SANITIZED}.json"
+        fi
+
+        git show "HEAD~1:${{ inputs.baselines-dir }}/${SANITIZED}.json" \
+          > "${LOCAL_FILE}" 2>/dev/null || true
+
+        if [ -s "${LOCAL_FILE}" ]; then
+          echo "prev_baseline_exists=true" >> "$GITHUB_OUTPUT"
+          echo "prev_baseline_path=${LOCAL_FILE}" >> "$GITHUB_OUTPUT"
+        else
+          echo "prev_baseline_exists=false" >> "$GITHUB_OUTPUT"
+          rm -f "${LOCAL_FILE}"
+          echo "No previous-commit baseline found — skipping sequential comparison."
+        fi
+
+    - name: Run benchmarks
+      shell: bash
+      run: ${{ inputs.benchmark-run-command }}
+
+    - name: Extract node
+      shell: bash
+      id: extract-node
+      run: |
+        NODE=$(python -c "
+        import json, sys
+        try:
+            data = json.load(open('${{ inputs.benchmark-results-file }}'))
+            print(data.get('machine_info', {}).get('node', 'unknown'))
+        except Exception as e:
+            print('unknown')
+        ")
+        echo "node=${NODE}" >> "$GITHUB_OUTPUT"
+
+    - name: Compare vs main branch baseline
+      if: github.event_name == 'pull_request' && steps.load-main-baseline.outputs.main_baseline_exists == 'true'
+      shell: bash
+      id: compare-main
+      run: |
+        SCRIPT_DIR="${{ github.action_path }}/scripts"
+        python "${SCRIPT_DIR}/benchmark_compare.py" compare-json \
+          "${{ steps.load-main-baseline.outputs.main_baseline_path }}" \
+          "${{ inputs.benchmark-results-file }}" \
+          --tolerance="${{ inputs.cross-branch-tolerance }}" \
+          > "${{ inputs.baselines-dir }}/main_comparison.txt" 2>&1
+        EXIT_CODE=$?
+        cat "${{ inputs.baselines-dir }}/main_comparison.txt"
+        if [ $EXIT_CODE -ne 0 ]; then
+          echo "main_regression=true" >> "$GITHUB_OUTPUT"
+        else
+          echo "main_regression=false" >> "$GITHUB_OUTPUT"
+        fi
+
+    - name: Compare vs previous-commit baseline
+      if: steps.load-prev-baseline.outputs.prev_baseline_exists == 'true'
+      shell: bash
+      id: compare-prev
+      run: |
+        SCRIPT_DIR="${{ github.action_path }}/scripts"
+        python "${SCRIPT_DIR}/benchmark_compare.py" compare-json \
+          "${{ steps.load-prev-baseline.outputs.prev_baseline_path }}" \
+          "${{ inputs.benchmark-results-file }}" \
+          --tolerance="${{ inputs.cross-branch-tolerance }}" \
+          > "${{ inputs.baselines-dir }}/current_comparison.txt" 2>&1
+        EXIT_CODE=$?
+        cat "${{ inputs.baselines-dir }}/current_comparison.txt"
+        if [ $EXIT_CODE -ne 0 ]; then
+          echo "prev_regression=true" >> "$GITHUB_OUTPUT"
+        else
+          echo "prev_regression=false" >> "$GITHUB_OUTPUT"
+        fi
+
+    - name: Check whether baseline needs updating
+      shell: bash
+      id: check-update
+      run: |
+        SCRIPT_DIR="${{ github.action_path }}/scripts"
+        SANITIZED="${{ steps.branch.outputs.sanitized_branch }}"
+        BASELINE_FILE="${{ inputs.baselines-dir }}/${SANITIZED}.json"
+
+        if [ ! -f "${BASELINE_FILE}" ]; then
+          echo "should_update=true" >> "$GITHUB_OUTPUT"
+          echo "No existing baseline — will create."
+        else
+          python "${SCRIPT_DIR}/benchmark_compare.py" compare-json \
+            "${BASELINE_FILE}" \
+            "${{ inputs.benchmark-results-file }}" \
+            --tolerance="${{ inputs.update-tolerance }}" \
+            > /dev/null 2>&1
+          if [ $? -eq 0 ]; then
+            echo "should_update=false" >> "$GITHUB_OUTPUT"
+            echo "Baseline within update tolerance — skipping update."
+          else
+            echo "should_update=true" >> "$GITHUB_OUTPUT"
+            echo "Baseline changed beyond update tolerance — will update."
+          fi
+        fi
+
+    - name: Save baseline
+      shell: bash
+      run: |
+        SCRIPT_DIR="${{ github.action_path }}/scripts"
+        python "${SCRIPT_DIR}/benchmark_baseline.py" save \
+          "${{ steps.branch.outputs.current_branch }}" \
+          "${{ inputs.benchmark-results-file }}" \
+          --baselines-dir="${{ inputs.baselines-dir }}"
+
+    - name: Commit baseline (push events only)
+      if: github.event_name == 'push' && steps.check-update.outputs.should_update == 'true'
+      uses: EndBug/add-and-commit@v9
+      with:
+        add: "${{ inputs.baselines-dir }}/"
+        default_author: github_actions
+        message: >-
+          chore(benchmark): update baseline for branch "${{ steps.branch.outputs.current_branch }}"
+          (node: ${{ steps.extract-node.outputs.node }}) [skip ci]
+        push: true
+
+    - name: Set outputs
+      shell: bash
+      id: set-outputs
+      run: |
+        MAIN_REG="${{ steps.compare-main.outputs.main_regression }}"
+        PREV_REG="${{ steps.compare-prev.outputs.prev_regression }}"
+        if [ "${MAIN_REG}" = "true" ] || [ "${PREV_REG}" = "true" ]; then
+          echo "regression-detected=true" >> "$GITHUB_OUTPUT"
+        else
+          echo "regression-detected=false" >> "$GITHUB_OUTPUT"
+        fi
+
+        UPDATE="${{ steps.check-update.outputs.should_update }}"
+        if [ "${{ github.event_name }}" = "push" ] && [ "${UPDATE}" = "true" ]; then
+          echo "baseline-updated=true" >> "$GITHUB_OUTPUT"
+        else
+          echo "baseline-updated=false" >> "$GITHUB_OUTPUT"
+        fi
+
+    - name: Post PR comment
+      if: github.event_name == 'pull_request'
+      uses: actions/github-script@v7
+      env:
+        NODE: ${{ steps.extract-node.outputs.node }}
+        PYTHON_VERSION: ${{ inputs.python-version }}
+        CURRENT_BRANCH: ${{ steps.branch.outputs.current_branch }}
+        RESULTS_FILE: ${{ inputs.benchmark-results-file }}
+        THRESHOLD_MAP: ${{ inputs.threshold-map }}
+        CROSS_BRANCH_TOLERANCE: ${{ inputs.cross-branch-tolerance }}
+        MAIN_BASELINE_EXISTS: ${{ steps.load-main-baseline.outputs.main_baseline_exists }}
+        PREV_BASELINE_EXISTS: ${{ steps.load-prev-baseline.outputs.prev_baseline_exists }}
+        BASELINES_DIR: ${{ inputs.baselines-dir }}
+        SHOULD_UPDATE: ${{ steps.check-update.outputs.should_update }}
+        UPDATE_TOLERANCE: ${{ inputs.update-tolerance }}
+        REGRESSION_DETECTED: ${{ steps.set-outputs.outputs.regression-detected }}
+      with:
+        github-token: ${{ inputs.github-token }}
+        script: |
+          const fs = require('fs');
+
+          function formatTime(seconds) {
+            if (seconds < 0.001) return `${(seconds * 1e6).toFixed(1)}µs`;
+            if (seconds < 1)    return `${(seconds * 1e3).toFixed(2)}ms`;
+            return `${seconds.toFixed(4)}s`;
+          }
+
+          function resolveThreshold(testName, thresholdMapStr) {
+            if (!thresholdMapStr) return 1.0;
+            let map;
+            try { map = JSON.parse(thresholdMapStr); } catch { return 1.0; }
+            for (const [substr, val] of Object.entries(map)) {
+              if (testName.includes(substr)) return val;
+            }
+            return 1.0;
+          }
+
+          const results = JSON.parse(fs.readFileSync(process.env.RESULTS_FILE, 'utf8'));
+          const thresholdMap = process.env.THRESHOLD_MAP || '';
+
+          // Build benchmark results table
+          let tableRows = '';
+          for (const bench of (results.benchmarks || [])) {
+            const mean = bench.stats?.mean ?? 0;
+            const threshold = resolveThreshold(bench.name, thresholdMap);
+            const status = mean <= threshold ? '✅ PASS' : '❌ FAIL';
+            tableRows += `| ${bench.name} | ${formatTime(mean)} | <${formatTime(threshold)} | ${status} |\n`;
+          }
+
+          // Load comparison text files
+          let mainComparison = '';
+          let prevComparison = '';
+          const baseDir = process.env.BASELINES_DIR;
+          if (process.env.MAIN_BASELINE_EXISTS === 'true') {
+            try { mainComparison = fs.readFileSync(`${baseDir}/main_comparison.txt`, 'utf8'); } catch {}
+          }
+          if (process.env.PREV_BASELINE_EXISTS === 'true') {
+            try { prevComparison = fs.readFileSync(`${baseDir}/current_comparison.txt`, 'utf8'); } catch {}
+          }
+
+          const mainSection = process.env.MAIN_BASELINE_EXISTS === 'true'
+            ? `#### vs Main Branch Baseline (${process.env.CROSS_BRANCH_TOLERANCE}% tolerance)\n\`\`\`\n${mainComparison}\`\`\``
+            : `#### vs Main Branch Baseline\n_No baseline found for main branch — first run or baseline not yet committed._`;
+
+          const prevSection = process.env.PREV_BASELINE_EXISTS === 'true'
+            ? `#### vs Current Branch Baseline (${process.env.CROSS_BRANCH_TOLERANCE}% tolerance)\n\`\`\`\n${prevComparison}\`\`\``
+            : `#### vs Current Branch Baseline\n_No previous baseline found for this branch._`;
+
+          const updateNote = process.env.SHOULD_UPDATE === 'true'
+            ? `💾 **Baseline Update:** Will be updated on merge`
+            : `⏭️ **Baseline Update:** Skipped (within ${process.env.UPDATE_TOLERANCE}% threshold)`;
+
+          const regressionNote = process.env.REGRESSION_DETECTED === 'true'
+            ? `\n> ⚠️ **Regression detected** — one or more benchmarks exceeded tolerance.\n`
+            : '';
+
+          const body = `## 📊 Performance Benchmark Results
+
+**Node:** ${process.env.NODE}
+**Python Version:** ${process.env.PYTHON_VERSION}
+**Branch:** ${process.env.CURRENT_BRANCH}
+${regressionNote}
+### Benchmark Results
+
+| Test | Mean Time | Threshold | Status |
+|------|-----------|-----------|--------|
+${tableRows}
+### Baseline Comparisons
+
+${mainSection}
+
+${prevSection}
+
+---
+
+${updateNote}`;
+
+          // Deduplicate: delete previous bot comment
+          const { data: comments } = await github.rest.issues.listComments({
+            owner: context.repo.owner,
+            repo: context.repo.repo,
+            issue_number: context.issue.number,
+          });
+          for (const comment of comments) {
+            if (comment.user.type === 'Bot' && comment.body.includes('## 📊 Performance Benchmark Results')) {
+              await github.rest.issues.deleteComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                comment_id: comment.id,
+              });
+            }
+          }
+
+          await github.rest.issues.createComment({
+            owner: context.repo.owner,
+            repo: context.repo.repo,
+            issue_number: context.issue.number,
+            body,
+          });
+
+    - name: Upload benchmark artifact
+      uses: actions/upload-artifact@v5
+      with:
+        name: benchmark-results-${{ github.run_number }}
+        path: ${{ inputs.benchmark-results-file }}
+        retention-days: 30
