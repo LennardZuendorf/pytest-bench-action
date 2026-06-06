@@ -12,6 +12,54 @@
       "sourceType": "github",
       "skillPath": "skills/index-use/SKILL.md",
       "computedHash": "06050545ab9806fe70112cd01766cc75af541e7184846b1cffff1706ecba240d"
+    },
+    "spec": {
+      "source": "lennardzuendorf/vibe",
+      "sourceType": "github",
+      "skillPath": ".agents/skills/spec/SKILL.md",
+      "computedHash": "d421009cb2e0f9a8daf99d0255ecf3102a26e357b4314992c3e131a226df4db0"
+    },
+    "vibe-amend": {
+      "source": "lennardzuendorf/vibe",
+      "sourceType": "github",
+      "skillPath": ".agents/skills/vibe-amend/SKILL.md",
+      "computedHash": "f54475499aac3424052f9096cb9cf5ecb701c59d1bd63bb182535bbffb79d4ce"
+    },
+    "vibe-compound": {
+      "source": "lennardzuendorf/vibe",
+      "sourceType": "github",
+      "skillPath": ".agents/skills/vibe-compound/SKILL.md",
+      "computedHash": "1efea250cdada6267f962287437be411da304dcbd2accf33f962e4b54dc42d57"
+    },
+    "vibe-feature": {
+      "source": "lennardzuendorf/vibe",
+      "sourceType": "github",
+      "skillPath": ".agents/skills/vibe-feature/SKILL.md",
+      "computedHash": "f6e70fcf88500290bec60c9bf269e6a5d03af401f04388e0610bc1f299ce5217"
+    },
+    "vibe-quick": {
+      "source": "lennardzuendorf/vibe",
+      "sourceType": "github",
+      "skillPath": ".agents/skills/vibe-quick/SKILL.md",
+      "computedHash": "06802d5de50317718539264bed6c1bf4b372eb38f403c587ff62d15e60d0956c"
+    },
+    "vibe-setup": {
+      "source": "lennardzuendorf/vibe",
+      "sourceType": "github",
+      "skillPath": ".agents/skills/vibe-setup/SKILL.md",
+      "computedHash": "0598bdd79709f2ee60a156db4d34c26f5d052fcd39378e47122f8ae4700d2933"
+    },
+    "vibe-strategy": {
+      "source": "lennardzuendorf/vibe",
+      "sourceType": "github",
+      "skillPath": ".agents/skills/vibe-strategy/SKILL.md",
+      "computedHash": "047da282941a5b548f8b616bee93db7eb1c52d2e572a382d367e7fb92f2a4998"
+    },
+    "vibe-verify": {
+      "source": "lennardzuendorf/vibe",
+      "sourceType": "github",
+      "skillPath": ".agents/skills/vibe-verify/SKILL.md",
+      "computedHash": "69fd2cbada43a216859eb4accb1c123175b0b285bd564aeecd2c9803ba3e5066"
     }
   }
 }
