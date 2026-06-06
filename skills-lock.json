@@ -1,0 +1,17 @@
+{
+  "version": 1,
+  "skills": {
+    "index-update": {
+      "source": "lennardzuendorf/indexed",
+      "sourceType": "github",
+      "skillPath": "skills/index-update/SKILL.md",
+      "computedHash": "ab0bb4eada4a7d1ec9922b957b9a44195904b4ddf619dbbd5238ba840ce4686a"
+    },
+    "index-use": {
+      "source": "lennardzuendorf/indexed",
+      "sourceType": "github",
+      "skillPath": "skills/index-use/SKILL.md",
+      "computedHash": "06050545ab9806fe70112cd01766cc75af541e7184846b1cffff1706ecba240d"
+    }
+  }
+}
