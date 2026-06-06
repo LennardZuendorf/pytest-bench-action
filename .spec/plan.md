@@ -2,6 +2,7 @@
 type: entrypoint
 scope: implementation
 covers: milestones, task breakdown, validation criteria, session planning
+children: []
 updated: 2026-06-06
 ---
 
@@ -77,10 +78,10 @@ Tasks:
 - [ ] Create `docs/example-workflow.yml` — full reference workflow showing typical usage
 - [ ] Write `CHANGELOG.md` — v1 feature set, known limitations, upgrade notes
 - [ ] Update `README.md` — add troubleshooting section (first run, node mismatch, fork PRs), fix default python-version mention
-- [ ] Write `.spec/product-release.md` — release checklist and criteria
-- [ ] Write `.spec/tech-action.md` — action step-by-step reference
-- [ ] Write `.spec/tech-scripts.md` — script internals reference
-- [ ] Write `.spec/lessons.md` — accumulated decisions and gotchas
+- [x] Write `.spec/product-release.md` — release checklist and criteria
+- [x] Write `.spec/features/composite-action/` — action step-by-step reference
+- [x] Write `.spec/features/python-scripts/` — script internals reference
+- [x] Write `.spec/lessons.md` — accumulated decisions and gotchas
 - [ ] Mark `scripts/benchmark_baseline.py` and `scripts/benchmark_compare.py` executable (`chmod 755`)
 - [ ] Validate action.yml has no obvious shell quoting or logic bugs
 

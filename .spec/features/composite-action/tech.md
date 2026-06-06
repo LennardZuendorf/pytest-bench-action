@@ -1,41 +1,14 @@
 ---
-type: branch
+type: feature-tech
 scope: technical
-parent: tech.md
-covers: action.yml step-by-step logic, conditional wiring, input/output contracts
+feature: composite-action
+parent: ../../tech.md
 updated: 2026-06-06
 ---
 
-# pytest-bench-action — Action Step Reference
+# composite-action — Technical Design
 
-**Parent:** [tech.md](tech.md)
-
----
-
-## Inputs
-
-| Input | Required | Default | Description |
-|-------|----------|---------|-------------|
-| `python-version` | No | `"3.14"` | Python version for `setup-python` |
-| `benchmark-run-command` | **Yes** | — | Full pytest-benchmark shell command |
-| `setup-command` | No | `""` | Dependency install (e.g. `pip install -e .`) |
-| `pre-benchmark-command` | No | `""` | Warm-up step before benchmarks |
-| `benchmark-results-file` | No | `benchmark-results.json` | Output path for pytest-benchmark JSON |
-| `cross-branch-tolerance` | No | `20` | % increase allowed vs main baseline |
-| `update-tolerance` | No | `5` | % drift to trigger baseline update |
-| `baselines-dir` | No | `.benchmarks/baselines` | Directory for stored baselines |
-| `github-token` | **Yes** | — | Token with `contents:write` + `pull-requests:write` |
-| `threshold-map` | No | `""` | JSON map of `test-name-substring → max-seconds` |
-
-## Outputs
-
-| Output | Values | Set by |
-|--------|--------|--------|
-| `regression-detected` | `"true"` / `"false"` | Step 17 (set-outputs) |
-| `baseline-updated` | `"true"` / `"false"` | Step 17 (set-outputs) |
-| `node` | hostname string | Step 11 (extract-node) |
-
----
+**Parent:** [tech.md](../../tech.md)
 
 ## Step-by-Step Logic
 
@@ -107,8 +80,7 @@ python scripts/benchmark_compare.py compare-json <baseline> <results> --toleranc
 ```bash
 python scripts/benchmark_compare.py compare-json /tmp/seq_baseline.json <results> --tolerance=${{ inputs.update-tolerance }}
 ```
-Exit 0 → `should_update=false`. Exit 1 → `should_update=true`.
-Skipped if no sequential baseline.
+Exit 0 → `should_update=false`. Exit 1 → `should_update=true`. Skipped if no sequential baseline.
 
 ### Step 15: Save baseline
 ```bash
@@ -121,7 +93,7 @@ Always runs. Overwrites `<baselines-dir>/<branch_sanitized>.json`.
 if: github.event_name == 'push' && steps.check-update.outputs.should_update == 'true'
 uses: EndBug/add-and-commit@v9
 with:
-  message: 'chore(benchmark): update baseline for branch "${{ steps.branch.outputs.branch }}" (node: ${{ steps.extract-node.outputs.node }}) [skip ci]'
+  message: 'chore(benchmark): update baseline for branch "..." (node: ...) [skip ci]'
 ```
 **Only on push events.** `[skip ci]` prevents infinite loop.
 
@@ -147,8 +119,6 @@ with:
   path: ${{ inputs.benchmark-results-file }}
   retention-days: 30
 ```
-
----
 
 ## Conditional Wiring Summary
 

@@ -1,16 +1,14 @@
 ---
-type: branch
+type: feature-tech
 scope: technical
-parent: tech.md
-covers: Python script internals, baseline JSON format, comparison algorithm, exit codes
+feature: python-scripts
+parent: ../../tech.md
 updated: 2026-06-06
 ---
 
-# pytest-bench-action — Script Internals
+# python-scripts — Technical Design
 
-**Parent:** [tech.md](tech.md)
-
----
+**Parent:** [tech.md](../../tech.md)
 
 ## benchmark_baseline.py
 
@@ -28,7 +26,7 @@ Entry point: `python scripts/benchmark_baseline.py <command> [args]`
 
 ```json
 {
-  "machine_info": { "node": "runner-abc", "python_version": "3.14.0", ... },
+  "machine_info": { "node": "runner-abc", "python_version": "3.14.0" },
   "benchmarks": [
     {
       "name": "test_foo",
@@ -102,18 +100,3 @@ test_baz               —           0.10ms      —         ⚪ NEW
 
 Summary: 2 passed, 1 failed | tolerance: 20%
 ```
-
----
-
-## Test Fixtures Needed
-
-For `tests/fixtures/`:
-
-| File | Purpose |
-|------|---------|
-| `baseline.json` | Clean baseline with 3–5 benchmarks |
-| `results_pass.json` | All benchmarks within tolerance |
-| `results_regression.json` | One benchmark exceeds tolerance |
-| `results_new_benchmark.json` | Adds a benchmark not in baseline |
-| `results_missing_benchmark.json` | Drops a benchmark from baseline |
-| `results_wrong_node.json` | Different `machine_info.node` than baseline |

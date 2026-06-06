@@ -1,9 +1,7 @@
 ---
 type: entrypoint
 scope: technical
-children:
-  - tech-action.md
-  - tech-scripts.md
+children: []
 updated: 2026-06-06
 ---
 
@@ -59,12 +57,12 @@ pytest-bench-action/
 
 ## Key Patterns
 
-- **Baseline storage:** `<baselines-dir>/<sanitized_branch>.json` committed to the repo. Branch names sanitized: `/\\ .` → `_`. -> [tech-scripts.md](tech-scripts.md)
-- **Dual baseline comparison:** Cross-branch (PR vs main baseline) + sequential (current vs HEAD~1 baseline). Each is independently optional. -> [tech-action.md](tech-action.md)
-- **Node lock:** `machine_info.node` extracted from benchmark JSON. Mismatched node → `exit 1`. Ensures apples-to-apples comparison. -> [tech-scripts.md](tech-scripts.md)
-- **PR comment deduplication:** `actions/github-script` deletes any prior comment containing `## 📊 Performance Benchmark Results` before posting. -> [tech-action.md](tech-action.md)
-- **Baseline auto-commit:** Only on `push` events AND when `should_update == 'true'`. Message always ends with `[skip ci]`. -> [tech-action.md](tech-action.md)
-- **Threshold map:** JSON string input mapping test-name substrings to max-seconds. First match wins. Default 1.0s fallback. Evaluated in PR comment step only. -> [tech-action.md](tech-action.md)
+- **Baseline storage:** `<baselines-dir>/<sanitized_branch>.json` committed to the repo. Branch names sanitized: `/\\ .` → `_`. -> [features/python-scripts/tech.md](features/python-scripts/tech.md)
+- **Dual baseline comparison:** Cross-branch (PR vs main baseline) + sequential (current vs HEAD~1 baseline). Each is independently optional. -> [features/composite-action/tech.md](features/composite-action/tech.md)
+- **Node lock:** `machine_info.node` extracted from benchmark JSON. Mismatched node → `exit 1`. Ensures apples-to-apples comparison. -> [features/python-scripts/tech.md](features/python-scripts/tech.md)
+- **PR comment deduplication:** `actions/github-script` deletes any prior comment containing `## 📊 Performance Benchmark Results` before posting. -> [features/composite-action/tech.md](features/composite-action/tech.md)
+- **Baseline auto-commit:** Only on `push` events AND when `should_update == 'true'`. Message always ends with `[skip ci]`. -> [features/composite-action/tech.md](features/composite-action/tech.md)
+- **Threshold map:** JSON string input mapping test-name substrings to max-seconds. First match wins. Default 1.0s fallback. Evaluated in PR comment step only. -> [features/composite-action/tech.md](features/composite-action/tech.md)
 
 ## Risks & Mitigations
 
@@ -77,9 +75,9 @@ pytest-bench-action/
 | Python 3.14 not available on runner | `python-version` is configurable; users can pin to 3.11/3.12/3.13 |
 | Missing benchmark causes silent skip | MISSING benchmarks fail the comparison step explicitly |
 
-## Branch Documents
+## Feature Specs
 
-| Document | Covers |
-|----------|--------|
-| **[tech-action.md](tech-action.md)** | action.yml step-by-step logic, conditional wiring, output contracts |
-| **[tech-scripts.md](tech-scripts.md)** | Python script internals: baseline format, comparison algorithm, exit codes |
+| Feature | Covers |
+|---------|--------|
+| **[features/composite-action/](features/composite-action/tech.md)** | action.yml step-by-step logic, conditional wiring, input/output contracts |
+| **[features/python-scripts/](features/python-scripts/tech.md)** | Script internals: baseline format, comparison algorithm, exit codes, test fixtures |
