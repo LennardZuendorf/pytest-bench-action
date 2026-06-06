@@ -2,7 +2,7 @@
 type: branch
 scope: product
 parent: product.md
-covers: release readiness, v1 criteria, user-facing documentation completeness
+covers: release readiness, v1 criteria, user-facing documentation completeness, GitHub Marketplace publication
 updated: 2026-06-06
 ---
 
@@ -40,9 +40,12 @@ A release is ready when ALL of the following are true:
 - [ ] `CHANGELOG.md` — v1 feature set documented
 
 ### Release Infrastructure
-- [ ] `v1.0.0` git tag created
-- [ ] `v1` floating tag pointing to same commit
-- [ ] GitHub Release published with notes
+- [ ] `branding:` block added to `action.yml` (icon + color) — required for Marketplace listing
+- [ ] `v1.0.0` git tag created and pushed
+- [ ] `v1` floating tag pointing to same commit — enables `@v1` pinning convention
+- [ ] GitHub Release drafted with notes drawn from `CHANGELOG.md`
+- [ ] "Publish this Action to the GitHub Marketplace" checkbox ticked on release form
+- [ ] Category set (CI / Testing) and Marketplace listing verified live
 - [ ] Action reachable via `uses: lennardzuendorf/pytest-bench-action@v1`
 
 ---

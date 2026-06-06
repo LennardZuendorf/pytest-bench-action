@@ -89,20 +89,22 @@ Tasks:
 
 ---
 
-## M2: v1 Release
+## M2: v1 Release + Marketplace
 
-**Goal:** Tagged v1 release on GitHub with release notes, action usable via `@v1`.
+**Goal:** Tagged v1 release published to GitHub Marketplace; action usable via `@v1` by anyone.
 **Sessions:** 1 | **Risk:** Low
 
 Tasks:
+- [ ] Add `branding:` block to `action.yml` (`icon: activity`, `color: purple`) — Marketplace requirement
 - [ ] Final review of `action.yml`, scripts, README for any rough edges
-- [ ] Create `v1.0.0` git tag
-- [ ] Create `v1` floating tag (points to same commit as `v1.0.0`) — required for `@v1` usage
-- [ ] Publish GitHub Release with notes drawn from `CHANGELOG.md`
-- [ ] Verify `uses: lennardzuendorf/pytest-bench-action@v1` resolves correctly
-- [ ] Optional: add CI workflow (`.github/workflows/ci.yml`) to lint/test scripts on every push
+- [ ] Create and push `v1.0.0` git tag: `git tag v1.0.0 && git push origin v1.0.0`
+- [ ] Create and push `v1` floating tag: `git tag -f v1 v1.0.0 && git push origin v1 --force`
+- [ ] Draft GitHub Release from `v1.0.0` tag with notes from `CHANGELOG.md`
+- [ ] Tick "Publish this Action to the GitHub Marketplace" on the release form; set category to CI / Testing
+- [ ] Verify Marketplace listing is live and `uses: lennardzuendorf/pytest-bench-action@v1` resolves
+- [ ] Optional: add CI workflow (`.github/workflows/ci.yml`) to run tests on every push
 
-**Done when:** `uses: lennardzuendorf/pytest-bench-action@v1` works in a real repo's workflow.
+**Done when:** Action appears on GitHub Marketplace and resolves correctly in a real repo's workflow.
 
 ---
 
