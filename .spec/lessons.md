@@ -1,38 +1,55 @@
 ---
 type: lessons
-updated: 2026-06-06
+updated: 2026-06-09
 ---
 
 # pytest-bench-action — Lessons & Gotchas
 
-Read this at the start of each session to avoid repeating past mistakes.
+Mistakes made and rules to prevent repeating them. Review at the start of every
+session. Tags make entries retrievable — scan for tags matching the work in hand.
 
 ---
 
-## Hard-Learned Rules
+### `[skip ci]` is non-negotiable on baseline commits
+**Pattern:** The action commits baselines back to the repo. Without `[skip ci]` in the message, the push triggers another CI run, which commits another baseline — forever.
+**Rule:** Every baseline commit message must end with `[skip ci]`. Never remove it.
+**Tags:** ci, baseline, commit, action.yml, loop
+**Date:** 2026-06-06
 
-### 1. `[skip ci]` is non-negotiable
-The action commits baselines back to the repo. Without `[skip ci]` in the commit message, the push triggers another CI run, which triggers another baseline commit, forever. This has burned us before. Every baseline commit message must end with `[skip ci]`.
+### Never compare benchmarks across machines
+**Pattern:** `machine_info.node` is the runner hostname. Comparing a baseline from `runner-abc` against results from `runner-xyz` produces meaningless numbers — runner specs vary.
+**Rule:** The node check in `benchmark_compare.py` is a hard `exit 1`, not a warning. Do not soften it.
+**Tags:** node, comparison, benchmark_compare, machine_info
+**Date:** 2026-06-06
 
-### 2. Never compare across machines
-`machine_info.node` in the benchmark JSON is the runner hostname. If you compare a baseline from `runner-abc` against results from `runner-xyz`, the numbers mean nothing — runner specs vary. The node check in `benchmark_compare.py` is a hard exit, not a warning. Do not soften it.
+### Stdlib only in `scripts/`
+**Pattern:** The action scripts run inside the caller's environment, which we don't control. Any `import requests` or similar silently breaks every caller that lacks it.
+**Rule:** Scripts use Python stdlib only — `json`, `pathlib`, `sys`, `datetime`. No third-party imports, no `pip install` in the action.
+**Tags:** scripts, stdlib, dependencies, python
+**Date:** 2026-06-06
 
-### 3. Stdlib only in `scripts/`
-The action scripts run inside the caller's environment. We have no control over what's installed. Adding any `import requests` or similar will silently break every caller that doesn't have it. `json`, `pathlib`, `sys`, `datetime` — that's the full list.
+### `fetch-depth: 2` on checkout
+**Pattern:** Sequential baseline loading uses `git show HEAD~1:...`, which needs at least two commits of history. The default shallow clone (`fetch-depth: 1`) makes it fail silently.
+**Rule:** Always set `fetch-depth: 2` on `actions/checkout`.
+**Tags:** checkout, git, baseline, action.yml, fetch-depth
+**Date:** 2026-06-06
 
-### 4. `fetch-depth: 2` on checkout
-`git show HEAD~1:...` for sequential baseline loading requires at least 2 commits of history. The default `fetch-depth: 1` (shallow clone) will cause `git show HEAD~1` to fail silently. Always specify `fetch-depth: 2`.
+### PR from fork can't commit a baseline
+**Pattern:** Forks have no write access to the upstream repo, so the baseline commit step cannot run on fork PRs.
+**Rule:** Gate the baseline commit on `github.event_name == 'push'`, never `pull_request`. Never remove that condition.
+**Tags:** fork, pull_request, commit, baseline, permissions
+**Date:** 2026-06-06
 
-### 5. PR from fork can't commit
-Forks don't have write access to the upstream repo. The baseline commit step is conditional on `github.event_name == 'push'`, not `pull_request`. Never remove that condition.
-
-### 6. Default `python-version: "3.14"` may break
-Python 3.14 may not be available on older runner images. When helping users debug, the first thing to check is whether `python-version` needs to be pinned to `"3.12"` or `"3.13"`.
+### Default `python-version: "3.14"` may not exist on a runner
+**Pattern:** Python 3.14 may be missing on older runner images, causing setup to fail in ways that look unrelated.
+**Rule:** `python-version` is configurable; when debugging caller failures, first check whether it needs pinning to `"3.12"` / `"3.13"`.
+**Tags:** python-version, runner, setup-python, debugging
+**Date:** 2026-06-06
 
 ---
 
 ## Design Decisions That Felt Weird But Are Correct
 
-- **Two tolerance inputs** (`cross-branch-tolerance` vs `update-tolerance`): The first is for catching regressions on PRs; the second is for deciding when to update the baseline. They serve different purposes. Merging them into one caused false baseline churn in early iterations.
-- **Deleting the old PR comment before posting a new one**: Just updating the existing comment leaves stale results if the benchmark set changes. Deleting + creating is cleaner and avoids race conditions with the old comment body.
-- **Stripping `data` arrays on baseline save**: pytest-benchmark stores every individual sample in `data`. For a 100-round benchmark this can be 100 floats. We only need the aggregates (`mean`, `median`, etc.). Stripping reduces file size by ~99%.
+- **Two tolerance inputs** (`cross-branch-tolerance` vs `update-tolerance`): the first catches regressions on PRs; the second decides when to update the baseline. Merging them caused false baseline churn in early iterations.
+- **Deleting the old PR comment before posting a new one**: just editing the existing comment leaves stale results when the benchmark set changes. Delete + create is cleaner and avoids races with the old body.
+- **Stripping `data` arrays on baseline save**: pytest-benchmark stores every sample in `data`. We only need the aggregates (`mean`, `median`, …); stripping reduces file size by ~99%.

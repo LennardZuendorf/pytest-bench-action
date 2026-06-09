@@ -1,14 +1,16 @@
 ---
 type: feature-tech
-scope: technical
 feature: python-scripts
+sibling: product.md
 parent: ../../tech.md
-updated: 2026-06-06
+updated: 2026-06-09
 ---
 
 # python-scripts — Technical Design
 
-**Parent:** [tech.md](../../tech.md)
+**Parent:** [../../tech.md](../../tech.md)
+**Requirements:** [product.md](product.md)
+**Plan:** [plan.md](plan.md)
 
 ## benchmark_baseline.py
 

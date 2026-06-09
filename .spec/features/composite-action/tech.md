@@ -1,14 +1,16 @@
 ---
 type: feature-tech
-scope: technical
 feature: composite-action
+sibling: product.md
 parent: ../../tech.md
-updated: 2026-06-06
+updated: 2026-06-09
 ---
 
 # composite-action — Technical Design
 
-**Parent:** [tech.md](../../tech.md)
+**Parent:** [../../tech.md](../../tech.md)
+**Requirements:** [product.md](product.md)
+**Plan:** [plan.md](plan.md)
 
 ## Step-by-Step Logic
 
