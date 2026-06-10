@@ -3,7 +3,7 @@ type: entrypoint
 scope: implementation
 covers: milestones, task breakdown, validation criteria, session planning
 children: []
-updated: 2026-06-06
+updated: 2026-06-10
 ---
 
 # pytest-bench-action — Implementation Plan
@@ -14,8 +14,10 @@ updated: 2026-06-06
 
 ## Validation Summary
 
+**Spec-vs-implementation audit (2026-06-10):** feature tech specs corrected to match `action.yml` and `scripts/` (baseline file paths, step output names, tolerance usage, sanitization, output format). Two release-blocking bugs found in `action.yml` — see M1 task 0. Details in [features/composite-action/tech.md](features/composite-action/tech.md) "Known Implementation Gaps".
+
 Already exists (don't rebuild):
-- Full composite action (`action.yml`) with 19 steps — all orchestration complete
+- Full composite action (`action.yml`) with 19 steps — orchestration complete, but regression/exit-code wiring is broken (M1 task 0)
 - Baseline management script (`scripts/benchmark_baseline.py`) — save/load/list working
 - Comparison engine (`scripts/benchmark_compare.py`) — node check, tolerance, exit codes
 - PR comment generation with deduplication
@@ -48,6 +50,7 @@ Must build (release gates):
 - **Node lock is hard failure:** Silent cross-machine comparison is worse than no comparison.
 - **`[skip ci]` on baseline commits:** Prevents infinite CI loops — non-negotiable.
 - **Dual tolerance inputs:** `cross-branch-tolerance` (default 20%) for PR vs main; `update-tolerance` (default 5%) for sequential drift detection.
+- **Both regression gates use `cross-branch-tolerance`:** the sequential (vs HEAD~1) comparison also gates at 20%, matching the implementation. `update-tolerance` is only the baseline-update trigger, never a failure gate — 5% would be too noisy for failing CI. (Documented 2026-06-10.)
 
 ### To Resolve
 - [ ] Should the action support `windows-latest` / `macos-latest` runners, or Linux-only for v1?
@@ -71,6 +74,11 @@ Must build (release gates):
 **Sessions:** 1–2 | **Risk:** Low
 
 Tasks:
+- [ ] **Task 0 — fix `action.yml` regression wiring** (found in 2026-06-10 audit, blocks everything else):
+  - `shell: bash` steps run under `-eo pipefail`, so `python …; EXIT_CODE=$?` in the compare-main / compare-prev / check-update steps is dead code: a compare exit 1 fails the step immediately. Replace with `EXIT_CODE=0; python … || EXIT_CODE=$?`.
+  - Side effect 1: any regression aborts the run before baseline save, outputs, PR comment, and artifact upload (no `if: always()` anywhere).
+  - Side effect 2: on push events, drift > `update-tolerance` makes check-update **fail the action** instead of setting `should_update=true` — baseline auto-update is effectively broken.
+  - Add a final fail-on-regression step (`exit 1` when `regression-detected == 'true'`) so the comment posts first and the job still fails, per product spec "fail loudly".
 - [ ] Write `tests/` directory with fixtures (`tests/fixtures/baseline.json`, `tests/fixtures/results.json`, `tests/fixtures/results_regression.json`, `tests/fixtures/results_new_benchmark.json`)
 - [ ] Write `tests/test_benchmark_baseline.py` — test save, load, list, branch sanitization, metadata injection
 - [ ] Write `tests/test_benchmark_compare.py` — test pass/fail/new/missing, node mismatch, tolerance boundaries, time formatting
@@ -78,12 +86,12 @@ Tasks:
 - [ ] Create `docs/example-workflow.yml` — full reference workflow showing typical usage
 - [ ] Write `CHANGELOG.md` — v1 feature set, known limitations, upgrade notes
 - [ ] Update `README.md` — add troubleshooting section (first run, node mismatch, fork PRs), fix default python-version mention
-- [x] Write `.spec/product-release.md` — release checklist and criteria
-- [x] Write `.spec/features/composite-action/` — action step-by-step reference
-- [x] Write `.spec/features/python-scripts/` — script internals reference
+- [x] ~~Write `.spec/product-release.md`~~ — dropped: release checklist lives in root `product.md` "v1 Release Criteria"; a separate branch doc would duplicate it
+- [x] Write `.spec/features/composite-action/` — action step-by-step reference (corrected against implementation 2026-06-10)
+- [x] Write `.spec/features/python-scripts/` — script internals reference (corrected against implementation 2026-06-10)
 - [x] Write `.spec/lessons.md` — accumulated decisions and gotchas
 - [ ] Mark `scripts/benchmark_baseline.py` and `scripts/benchmark_compare.py` executable (`chmod 755`)
-- [ ] Validate action.yml has no obvious shell quoting or logic bugs
+- [x] Validate action.yml for shell quoting / logic bugs — audit done 2026-06-10; findings folded into Task 0
 
 **Done when:** `python -m pytest tests/` exits 0, README has troubleshooting section, CHANGELOG exists.
 
@@ -118,5 +126,5 @@ M1 (tests + docs) → M2 (tag + release)
 
 | Milestone | Status | Sessions Used | Estimate |
 |-----------|--------|---------------|----------|
-| M1 | NOT STARTED | 0 | 1–2 |
+| M1 | AUDIT DONE, IMPL NOT STARTED | 0 | 1–2 |
 | M2 | NOT STARTED | 0 | 1 |
