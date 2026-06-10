@@ -173,12 +173,12 @@ runs:
       id: compare-main
       run: |
         SCRIPT_DIR="${{ github.action_path }}/scripts"
+        EXIT_CODE=0
         python "${SCRIPT_DIR}/benchmark_compare.py" compare-json \
           "${{ steps.load-main-baseline.outputs.main_baseline_path }}" \
           "${{ inputs.benchmark-results-file }}" \
           --tolerance="${{ inputs.cross-branch-tolerance }}" \
-          > "${{ inputs.baselines-dir }}/main_comparison.txt" 2>&1
-        EXIT_CODE=$?
+          > "${{ inputs.baselines-dir }}/main_comparison.txt" 2>&1 || EXIT_CODE=$?
         cat "${{ inputs.baselines-dir }}/main_comparison.txt"
         if [ $EXIT_CODE -ne 0 ]; then
           echo "main_regression=true" >> "$GITHUB_OUTPUT"
@@ -192,12 +192,12 @@ runs:
       id: compare-prev
       run: |
         SCRIPT_DIR="${{ github.action_path }}/scripts"
+        EXIT_CODE=0
         python "${SCRIPT_DIR}/benchmark_compare.py" compare-json \
           "${{ steps.load-prev-baseline.outputs.prev_baseline_path }}" \
           "${{ inputs.benchmark-results-file }}" \
           --tolerance="${{ inputs.cross-branch-tolerance }}" \
-          > "${{ inputs.baselines-dir }}/current_comparison.txt" 2>&1
-        EXIT_CODE=$?
+          > "${{ inputs.baselines-dir }}/current_comparison.txt" 2>&1 || EXIT_CODE=$?
         cat "${{ inputs.baselines-dir }}/current_comparison.txt"
         if [ $EXIT_CODE -ne 0 ]; then
           echo "prev_regression=true" >> "$GITHUB_OUTPUT"
@@ -217,12 +217,11 @@ runs:
           echo "should_update=true" >> "$GITHUB_OUTPUT"
           echo "No existing baseline — will create."
         else
-          python "${SCRIPT_DIR}/benchmark_compare.py" compare-json \
+          if python "${SCRIPT_DIR}/benchmark_compare.py" compare-json \
             "${BASELINE_FILE}" \
             "${{ inputs.benchmark-results-file }}" \
             --tolerance="${{ inputs.update-tolerance }}" \
-            > /dev/null 2>&1
-          if [ $? -eq 0 ]; then
+            > /dev/null 2>&1; then
             echo "should_update=false" >> "$GITHUB_OUTPUT"
             echo "Baseline within update tolerance — skipping update."
           else
@@ -346,26 +345,29 @@ runs:
             ? `\n> ⚠️ **Regression detected** — one or more benchmarks exceeded tolerance.\n`
             : '';
 
-          const body = `## 📊 Performance Benchmark Results
-
-**Node:** ${process.env.NODE}
-**Python Version:** ${process.env.PYTHON_VERSION}
-**Branch:** ${process.env.CURRENT_BRANCH}
-${regressionNote}
-### Benchmark Results
-
-| Test | Mean Time | Threshold | Status |
-|------|-----------|-----------|--------|
-${tableRows}
-### Baseline Comparisons
-
-${mainSection}
-
-${prevSection}
-
----
-
-${updateNote}`;
+          const body = [
+            '## 📊 Performance Benchmark Results',
+            '',
+            `**Node:** ${process.env.NODE}`,
+            `**Python Version:** ${process.env.PYTHON_VERSION}`,
+            `**Branch:** ${process.env.CURRENT_BRANCH}`,
+            regressionNote,
+            '### Benchmark Results',
+            '',
+            '| Test | Mean Time | Threshold | Status |',
+            '|------|-----------|-----------|--------|',
+            tableRows.trimEnd(),
+            '',
+            '### Baseline Comparisons',
+            '',
+            mainSection,
+            '',
+            prevSection,
+            '',
+            '---',
+            '',
+            updateNote,
+          ].join('\n');
 
           // Deduplicate: delete previous bot comment
           const { data: comments } = await github.rest.issues.listComments({
@@ -396,3 +398,10 @@ ${updateNote}`;
         name: benchmark-results-${{ github.run_number }}
         path: ${{ inputs.benchmark-results-file }}
         retention-days: 30
+
+    - name: Fail on regression
+      if: steps.set-outputs.outputs.regression-detected == 'true'
+      shell: bash
+      run: |
+        echo "::error::Performance regression detected — one or more benchmarks exceeded tolerance. See the comparison output above."
+        exit 1

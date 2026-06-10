@@ -2,7 +2,7 @@
 type: entrypoint
 scope: product
 children: []
-updated: 2026-06-06
+updated: 2026-06-10
 ---
 
 # pytest-bench-action — Product
@@ -76,16 +76,16 @@ A release is ready when ALL of the following are true.
 - [x] Threshold map evaluated per-test in PR comment
 
 ### Testing
-- [ ] `tests/` directory with realistic JSON fixtures exists
-- [ ] `tests/test_benchmark_baseline.py` covers save, load, list, sanitization
-- [ ] `tests/test_benchmark_compare.py` covers pass/fail/new/missing/node-mismatch/tolerance
-- [ ] All tests pass: `python -m pytest tests/`
+- [x] `tests/` directory with realistic JSON fixtures exists
+- [x] `tests/test_benchmark_baseline.py` covers save, load, list, sanitization
+- [x] `tests/test_benchmark_compare.py` covers pass/fail/new/missing/node-mismatch/tolerance
+- [x] All tests pass: `python -m pytest tests/` (43 tests, 2026-06-10)
 
 ### Documentation
 - [x] `README.md` with inputs/outputs table and basic usage
-- [ ] `README.md` troubleshooting section (first run, node mismatch, fork PRs, `[skip ci]`)
-- [ ] `docs/example-workflow.yml` — complete reference workflow
-- [ ] `CHANGELOG.md` — v1 feature set documented
+- [x] `README.md` troubleshooting section (first run, node mismatch, fork PRs, `[skip ci]`)
+- [x] `docs/example-workflow.yml` — complete reference workflow
+- [x] `CHANGELOG.md` — v1 feature set documented
 
 ### Release Infrastructure
 - [ ] `branding:` block added to `action.yml` (`icon: activity`, `color: purple`) — required for Marketplace listing

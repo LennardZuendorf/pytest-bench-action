@@ -2,7 +2,7 @@
 type: entrypoint
 scope: technical
 children: []
-updated: 2026-06-06
+updated: 2026-06-10
 ---
 
 # pytest-bench-action — Technical Architecture
@@ -19,7 +19,7 @@ updated: 2026-06-06
 
 ```
 pytest-bench-action/
-├── action.yml                  # Composite action — 19 steps, all orchestration lives here
+├── action.yml                  # Composite action — 20 steps, all orchestration lives here
 ├── scripts/
 │   ├── benchmark_baseline.py   # save | load | list commands (stdlib only)
 │   └── benchmark_compare.py    # compare-json command (stdlib only)

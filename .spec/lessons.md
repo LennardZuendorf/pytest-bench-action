@@ -1,6 +1,6 @@
 ---
 type: lessons
-updated: 2026-06-06
+updated: 2026-06-10
 ---
 
 # pytest-bench-action — Lessons & Gotchas
@@ -27,7 +27,13 @@ The action scripts run inside the caller's environment. We have no control over 
 Forks don't have write access to the upstream repo. The baseline commit step is conditional on `github.event_name == 'push'`, not `pull_request`. Never remove that condition.
 
 ### 6. Default `python-version: "3.14"` may break
-Python 3.14 may not be available on older runner images. When helping users debug, the first thing to check is whether `python-version` needs to be pinned to `"3.12"` or `"3.13"`.
+Python 3.14 may not be available on older runner images. When helping users debug, the first thing to check is whether `python-version` needs to be pinned to `"3.12"` or `"3.13"`. Decision (2026-06-10): the default tracks the latest stable Python; the README documents pinning.
+
+### 7. `shell: bash` steps run under `-eo pipefail`
+GitHub injects `bash --noprofile --norc -eo pipefail` for `shell: bash`. The pattern `some_command; EXIT_CODE=$?` is dead code — a non-zero exit kills the step before `$?` is read. Capture expected failures with `EXIT_CODE=0; some_command || EXIT_CODE=$?` (or `if some_command; then`). This silently broke regression reporting AND baseline auto-update until the 2026-06-10 audit.
+
+### 8. Don't put column-0 lines inside `script: |` blocks
+A multiline JS template literal whose content starts at column 0 terminates the YAML block scalar and makes the whole `action.yml` invalid. Build multiline strings (like the PR comment body) as an array of single-line strings joined with `'\n'`. Always run `python -c "import yaml; yaml.safe_load(open('action.yml'))"` before pushing — the file parsed fine in nobody's head and in no CI until it didn't.
 
 ---
 

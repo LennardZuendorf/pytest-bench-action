@@ -14,10 +14,10 @@ updated: 2026-06-10
 
 ## Validation Summary
 
-**Spec-vs-implementation audit (2026-06-10):** feature tech specs corrected to match `action.yml` and `scripts/` (baseline file paths, step output names, tolerance usage, sanitization, output format). Two release-blocking bugs found in `action.yml` — see M1 task 0. Details in [features/composite-action/tech.md](features/composite-action/tech.md) "Known Implementation Gaps".
+**Spec-vs-implementation audit (2026-06-10):** feature tech specs corrected to match `action.yml` and `scripts/` (baseline file paths, step output names, tolerance usage, sanitization, output format). Three release-blocking bugs found in `action.yml` (invalid YAML, dead exit-code handling under `bash -e`, no fail-on-regression) — all fixed same day under M1 task 0.
 
 Already exists (don't rebuild):
-- Full composite action (`action.yml`) with 19 steps — orchestration complete, but regression/exit-code wiring is broken (M1 task 0)
+- Full composite action (`action.yml`) with 20 steps — orchestration complete, regression wiring fixed 2026-06-10
 - Baseline management script (`scripts/benchmark_baseline.py`) — save/load/list working
 - Comparison engine (`scripts/benchmark_compare.py`) — node check, tolerance, exit codes
 - PR comment generation with deduplication
@@ -54,7 +54,7 @@ Must build (release gates):
 
 ### To Resolve
 - [ ] Should the action support `windows-latest` / `macos-latest` runners, or Linux-only for v1?
-- [ ] Default `python-version: "3.14"` — change to `"3.12"` for broader runner compatibility?
+- [x] Default `python-version` — **resolved 2026-06-10: track latest stable Python (currently `"3.14"`)**; README documents pinning `"3.12"`/`"3.13"` on older runner images
 - [ ] Should integration tests run in CI (self-hosted or GitHub-hosted) as part of the release gate?
 
 ---
@@ -74,23 +74,23 @@ Must build (release gates):
 **Sessions:** 1–2 | **Risk:** Low
 
 Tasks:
-- [ ] **Task 0 — fix `action.yml` regression wiring** (found in 2026-06-10 audit, blocks everything else):
+- [x] **Task 0 — fix `action.yml` regression wiring** (found in 2026-06-10 audit; done, plus a bonus find: `action.yml` was invalid YAML — the PR-comment body template literal terminated the `script: |` block scalar; rebuilt as a joined line array):
   - `shell: bash` steps run under `-eo pipefail`, so `python …; EXIT_CODE=$?` in the compare-main / compare-prev / check-update steps is dead code: a compare exit 1 fails the step immediately. Replace with `EXIT_CODE=0; python … || EXIT_CODE=$?`.
   - Side effect 1: any regression aborts the run before baseline save, outputs, PR comment, and artifact upload (no `if: always()` anywhere).
   - Side effect 2: on push events, drift > `update-tolerance` makes check-update **fail the action** instead of setting `should_update=true` — baseline auto-update is effectively broken.
   - Add a final fail-on-regression step (`exit 1` when `regression-detected == 'true'`) so the comment posts first and the job still fails, per product spec "fail loudly".
-- [ ] Write `tests/` directory with fixtures (`tests/fixtures/baseline.json`, `tests/fixtures/results.json`, `tests/fixtures/results_regression.json`, `tests/fixtures/results_new_benchmark.json`)
-- [ ] Write `tests/test_benchmark_baseline.py` — test save, load, list, branch sanitization, metadata injection
-- [ ] Write `tests/test_benchmark_compare.py` — test pass/fail/new/missing, node mismatch, tolerance boundaries, time formatting
-- [ ] Verify both scripts pass tests locally (`python -m pytest tests/`)
-- [ ] Create `docs/example-workflow.yml` — full reference workflow showing typical usage
-- [ ] Write `CHANGELOG.md` — v1 feature set, known limitations, upgrade notes
-- [ ] Update `README.md` — add troubleshooting section (first run, node mismatch, fork PRs), fix default python-version mention
+- [x] Write `tests/` directory with fixtures (`tests/fixtures/baseline.json`, `tests/fixtures/results.json`, `tests/fixtures/results_regression.json`, `tests/fixtures/results_new_benchmark.json`)
+- [x] Write `tests/test_benchmark_baseline.py` — test save, load, list, branch sanitization, metadata injection
+- [x] Write `tests/test_benchmark_compare.py` — test pass/fail/new/missing, node mismatch, tolerance boundaries, time formatting
+- [x] Verify both scripts pass tests locally (`python -m pytest tests/`)
+- [x] Create `docs/example-workflow.yml` — full reference workflow showing typical usage
+- [x] Write `CHANGELOG.md` — v1 feature set, known limitations, upgrade notes
+- [x] Update `README.md` — add troubleshooting section (first run, node mismatch, fork PRs), fix default python-version mention
 - [x] ~~Write `.spec/product-release.md`~~ — dropped: release checklist lives in root `product.md` "v1 Release Criteria"; a separate branch doc would duplicate it
 - [x] Write `.spec/features/composite-action/` — action step-by-step reference (corrected against implementation 2026-06-10)
 - [x] Write `.spec/features/python-scripts/` — script internals reference (corrected against implementation 2026-06-10)
 - [x] Write `.spec/lessons.md` — accumulated decisions and gotchas
-- [ ] Mark `scripts/benchmark_baseline.py` and `scripts/benchmark_compare.py` executable (`chmod 755`)
+- [x] Mark `scripts/benchmark_baseline.py` and `scripts/benchmark_compare.py` executable (`chmod 755`)
 - [x] Validate action.yml for shell quoting / logic bugs — audit done 2026-06-10; findings folded into Task 0
 
 **Done when:** `python -m pytest tests/` exits 0, README has troubleshooting section, CHANGELOG exists.
@@ -126,5 +126,5 @@ M1 (tests + docs) → M2 (tag + release)
 
 | Milestone | Status | Sessions Used | Estimate |
 |-----------|--------|---------------|----------|
-| M1 | AUDIT DONE, IMPL NOT STARTED | 0 | 1–2 |
+| M1 | **COMPLETE** (2026-06-10) | 1 | 1–2 |
 | M2 | NOT STARTED | 0 | 1 |

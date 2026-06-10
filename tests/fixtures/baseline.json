@@ -1,0 +1,47 @@
+{
+  "machine_info": {
+    "node": "runner-abc",
+    "processor": "x86_64",
+    "machine": "x86_64",
+    "python_version": "3.14.0",
+    "system": "Linux"
+  },
+  "datetime": "2026-06-09T12:00:00.000000",
+  "benchmarks": [
+    {
+      "group": null,
+      "name": "test_foo",
+      "fullname": "tests/benchmarks/test_perf.py::test_foo",
+      "stats": {
+        "min": 0.00095,
+        "max": 0.00112,
+        "mean": 0.001,
+        "stddev": 0.00003,
+        "rounds": 100,
+        "median": 0.00099,
+        "iqr": 0.00004,
+        "ops": 1000.0
+      }
+    },
+    {
+      "group": null,
+      "name": "test_bar",
+      "fullname": "tests/benchmarks/test_perf.py::test_bar",
+      "stats": {
+        "min": 0.00047,
+        "max": 0.00058,
+        "mean": 0.0005,
+        "stddev": 0.00002,
+        "rounds": 200,
+        "median": 0.0005,
+        "iqr": 0.00002,
+        "ops": 2000.0
+      }
+    }
+  ],
+  "baseline_info": {
+    "branch": "main",
+    "node": "runner-abc",
+    "created_at": "2026-06-09T12:00:01+00:00"
+  }
+}

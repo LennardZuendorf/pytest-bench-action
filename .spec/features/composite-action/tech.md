@@ -12,7 +12,7 @@ updated: 2026-06-10
 
 ## Step-by-Step Logic
 
-Step numbers below match the order of the 19 steps in `action.yml`.
+Step numbers below match the order of the 20 steps in `action.yml`.
 
 ### Step 1: Checkout
 ```yaml
@@ -121,6 +121,13 @@ with:
   retention-days: 30
 ```
 
+### Step 20: Fail on regression
+```yaml
+if: steps.set-outputs.outputs.regression-detected == 'true'
+run: exit 1   # with ::error:: annotation
+```
+Last step by design: the PR comment (Step 18) and artifact (Step 19) always publish before the job fails. Compare steps (12–13) capture exit codes non-fatally (`EXIT_CODE=0; … || EXIT_CODE=$?`) because GitHub runs `shell: bash` with `-eo pipefail`.
+
 ## Conditional Wiring Summary
 
 | Condition | Steps affected |
@@ -134,13 +141,8 @@ with:
 
 Step 14 always runs; a missing on-disk baseline means `should_update=true`.
 
-## Known Implementation Gaps (validated against `action.yml` 2026-06-10)
+## Known Implementation Gaps
 
-Tracked as M1 tasks in [.spec/plan.md](../../plan.md):
+1. **No `branding:` block** yet (Marketplace requirement, M2).
 
-1. **Exit-code handling is dead code under `bash -e`.** GitHub runs `shell: bash` steps with `-eo pipefail`. In Steps 12, 13, and 14 the pattern `python … ; EXIT_CODE=$?` never reaches the `$?` check when the compare script exits 1 — the step fails immediately. Consequences:
-   - On any regression, the action aborts at Step 12/13; Steps 14–19 (baseline save, outputs, **PR comment**, artifact) are skipped — no `if: always()` anywhere.
-   - On push events with drift > `update-tolerance`, Step 14's compare exits 1 and **fails the whole action** instead of setting `should_update=true`.
-   - Fix shape: `EXIT_CODE=0; python … || EXIT_CODE=$?`, plus `if: always()`-style wiring where downstream steps must still run.
-2. **No explicit fail-on-regression step.** Product spec requires "regressions surface as a failing step" *after* the PR comment is posted. Intended design: capture compare exit codes non-fatally, run comment/artifact steps, then a final step exits 1 when `regression-detected == 'true'`.
-3. **No `branding:` block** yet (Marketplace requirement, M2).
+Resolved 2026-06-10 (M1 task 0): dead exit-code handling under `bash -eo pipefail` in Steps 12–14 (now `EXIT_CODE=0; … || EXIT_CODE=$?` / `if python …; then`), missing fail-on-regression step (now Step 20), and an invalid-YAML bug — the PR-comment body was a multiline JS template literal whose column-0 lines terminated the `script: |` block scalar (now built as a joined array of lines).
