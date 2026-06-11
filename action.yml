@@ -2,6 +2,10 @@ name: pytest-bench-action
 description: Run pytest-benchmark, manage per-branch baselines, and post PR comparison comments.
 author: lennardzuendorf
 
+branding:
+  icon: activity
+  color: purple
+
 inputs:
   python-version:
     description: Python version for consistent benchmarks
@@ -109,7 +113,9 @@ runs:
       run: |
         TARGET_BRANCH="${{ github.base_ref }}"
         SANITIZED_TARGET=$(echo "${TARGET_BRANCH}" | tr '/\\. ' '_')
-        BASELINE_PATH="${{ inputs.baselines-dir }}/main.json"
+        # Dedicated scratch file (not a branch name) so we never clobber a
+        # committed baseline, whatever the base branch is called.
+        BASELINE_PATH="${{ inputs.baselines-dir }}/_cross_baseline.json"
 
         git show "origin/${TARGET_BRANCH}:${{ inputs.baselines-dir }}/${SANITIZED_TARGET}.json" \
           > "${BASELINE_PATH}" 2>/dev/null || true
@@ -120,7 +126,7 @@ runs:
         else
           echo "main_baseline_exists=false" >> "$GITHUB_OUTPUT"
           rm -f "${BASELINE_PATH}"
-          echo "No main branch baseline found — skipping cross-branch comparison."
+          echo "No baseline found for base branch '${TARGET_BRANCH}' — skipping cross-branch comparison."
         fi
 
     - name: Load previous-commit baseline
@@ -276,6 +282,7 @@ runs:
         NODE: ${{ steps.extract-node.outputs.node }}
         PYTHON_VERSION: ${{ inputs.python-version }}
         CURRENT_BRANCH: ${{ steps.branch.outputs.current_branch }}
+        BASE_REF: ${{ github.base_ref }}
         RESULTS_FILE: ${{ inputs.benchmark-results-file }}
         THRESHOLD_MAP: ${{ inputs.threshold-map }}
         CROSS_BRANCH_TOLERANCE: ${{ inputs.cross-branch-tolerance }}
@@ -329,9 +336,10 @@ runs:
             try { prevComparison = fs.readFileSync(`${baseDir}/current_comparison.txt`, 'utf8'); } catch {}
           }
 
+          const baseRef = process.env.BASE_REF || 'base branch';
           const mainSection = process.env.MAIN_BASELINE_EXISTS === 'true'
-            ? `#### vs Main Branch Baseline (${process.env.CROSS_BRANCH_TOLERANCE}% tolerance)\n\`\`\`\n${mainComparison}\`\`\``
-            : `#### vs Main Branch Baseline\n_No baseline found for main branch — first run or baseline not yet committed._`;
+            ? `#### vs Base Branch \`${baseRef}\` (${process.env.CROSS_BRANCH_TOLERANCE}% tolerance)\n\`\`\`\n${mainComparison}\`\`\``
+            : `#### vs Base Branch \`${baseRef}\`\n_No baseline found for \`${baseRef}\` — first run or baseline not yet committed._`;
 
           const prevSection = process.env.PREV_BASELINE_EXISTS === 'true'
             ? `#### vs Current Branch Baseline (${process.env.CROSS_BRANCH_TOLERANCE}% tolerance)\n\`\`\`\n${prevComparison}\`\`\``

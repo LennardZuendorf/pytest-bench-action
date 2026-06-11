@@ -47,9 +47,15 @@ Outputs: `current_branch`, `sanitized_branch`.
 ### Step 8: Load cross-branch baseline (PR only, `id: load-main-baseline`)
 ```bash
 git show "origin/${TARGET_BRANCH}:${{ inputs.baselines-dir }}/${SANITIZED_TARGET}.json" \
-  > "${{ inputs.baselines-dir }}/main.json" 2>/dev/null || true
+  > "${{ inputs.baselines-dir }}/_cross_baseline.json" 2>/dev/null || true
 ```
-The baseline is materialized **inside `baselines-dir` as `main.json`** (not `/tmp`). If the file is empty/missing it is removed and `main_baseline_exists=false`; otherwise outputs `main_baseline_exists=true` and `main_baseline_path`.
+The base branch is `github.base_ref` (any branch, not just `main`). The baseline
+is materialized **inside `baselines-dir` as the scratch file `_cross_baseline.json`**
+— a dedicated non-branch name so a committed baseline is never clobbered, whatever
+the base branch is called. If the file is empty/missing it is removed and
+`main_baseline_exists=false`; otherwise outputs `main_baseline_exists=true` and
+`main_baseline_path`. (The output names retain the `main_*` prefix for historical
+reasons; they refer to the base/target branch, not literally `main`.)
 
 ### Step 9: Load previous-commit baseline (`id: load-prev-baseline`)
 ```bash
@@ -109,7 +115,7 @@ uses: actions/github-script@v7
 Inline JavaScript:
 1. List all issue comments on the PR
 2. Delete any comment whose body contains `## 📊 Performance Benchmark Results`
-3. Build new comment body from `main_comparison.txt` / `current_comparison.txt`, threshold-map evaluation (substring match, first match wins, 1.0s default), and status flags
+3. Build new comment body from `main_comparison.txt` / `current_comparison.txt`, threshold-map evaluation (substring match, first match wins, 1.0s default), and status flags. The cross-branch section is labelled with the actual base ref (`github.base_ref`, e.g. "vs Base Branch `develop`"), not a hardcoded "Main".
 4. Create new comment
 
 ### Step 19: Upload artifact
@@ -143,6 +149,8 @@ Step 14 always runs; a missing on-disk baseline means `should_update=true`.
 
 ## Known Implementation Gaps
 
-1. **No `branding:` block** yet (Marketplace requirement, M2).
+None blocking v1.
 
 Resolved 2026-06-10 (M1 task 0): dead exit-code handling under `bash -eo pipefail` in Steps 12–14 (now `EXIT_CODE=0; … || EXIT_CODE=$?` / `if python …; then`), missing fail-on-regression step (now Step 20), and an invalid-YAML bug — the PR-comment body was a multiline JS template literal whose column-0 lines terminated the `script: |` block scalar (now built as a joined array of lines).
+
+Resolved 2026-06-11 (Phase C, pre-release review): added the `branding:` block (`icon: activity`, `color: purple`, Marketplace requirement); the cross-branch scratch file is now `_cross_baseline.json` and the PR-comment label uses the real base ref, so non-`main` default branches are handled correctly; scripts now read/write with explicit `encoding="utf-8"`.

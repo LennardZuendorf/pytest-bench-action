@@ -73,6 +73,18 @@ class TestSave:
             assert result.returncode == 0
         assert len(list(tmp_path.glob("*.json"))) == 1
 
+    def test_unicode_names_round_trip_utf8(self, run_script, write_json, tmp_path):
+        # Non-ASCII benchmark names must survive save/load regardless of locale
+        # (scripts read/write with explicit utf-8).
+        results = write_json("uni.json", make_results(benchmarks={"test_café_ωμέγα": 0.001}))
+        save = run_script(SCRIPT, "save", "main", str(results), f"--baselines-dir={tmp_path}")
+        assert save.returncode == 0, save.stderr
+        load = run_script(SCRIPT, "load", "main", f"--baselines-dir={tmp_path}")
+        assert load.returncode == 0
+        # JSON may escape non-ASCII (ensure_ascii); assert on the parsed value.
+        loaded = json.loads(load.stdout)
+        assert loaded["benchmarks"][0]["name"] == "test_café_ωμέγα"
+
     def test_missing_results_file_exits_1(self, run_script, tmp_path):
         result = run_script(SCRIPT, "save", "main", str(tmp_path / "nope.json"), f"--baselines-dir={tmp_path}")
         assert result.returncode == 1

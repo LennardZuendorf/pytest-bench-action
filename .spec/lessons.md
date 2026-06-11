@@ -35,6 +35,12 @@ GitHub injects `bash --noprofile --norc -eo pipefail` for `shell: bash`. The pat
 ### 8. Don't put column-0 lines inside `script: |` blocks
 A multiline JS template literal whose content starts at column 0 terminates the YAML block scalar and makes the whole `action.yml` invalid. Build multiline strings (like the PR comment body) as an array of single-line strings joined with `'\n'`. Always run `python -c "import yaml; yaml.safe_load(open('action.yml'))"` before pushing — the file parsed fine in nobody's head and in no CI until it didn't.
 
+### 9. Read/write files with explicit `encoding="utf-8"`
+Bare `open()` / `Path.read_text()` use the locale encoding, which is not guaranteed UTF-8 on every runner. Benchmark JSON can carry non-ASCII test ids. All script file I/O passes `encoding="utf-8"`. (Note: `json.dumps` defaults to `ensure_ascii=True`, so non-ASCII is stored as `\uXXXX` escapes — lossless; assert on parsed values, not raw stdout, in tests.)
+
+### 10. Don't hardcode `main` as the base branch
+The cross-branch comparison uses `github.base_ref`, and a repo's default branch may not be `main`. The scratch baseline file is `_cross_baseline.json` (not a branch name) and the PR-comment label uses the real base ref. "Works with any suite, zero friction" includes repos that don't call their integration branch `main`.
+
 ---
 
 ## Design Decisions That Felt Weird But Are Correct
