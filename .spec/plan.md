@@ -3,7 +3,7 @@ type: entrypoint
 scope: implementation
 covers: milestones, task breakdown, validation criteria, session planning
 children: []
-updated: 2026-06-10
+updated: 2026-06-11
 ---
 
 # pytest-bench-action — Implementation Plan
@@ -15,6 +15,8 @@ updated: 2026-06-10
 ## Validation Summary
 
 **Spec-vs-implementation audit (2026-06-10):** feature tech specs corrected to match `action.yml` and `scripts/` (baseline file paths, step output names, tolerance usage, sanitization, output format). Three release-blocking bugs found in `action.yml` (invalid YAML, dead exit-code handling under `bash -e`, no fail-on-regression) — all fixed same day under M1 task 0.
+
+**Shipped (2026-06-11):** all M1 work is up as [PR #3](https://github.com/LennardZuendorf/pytest-bench-action/pull/3) (branch `claude/wonderful-volta-jvuhfk`). M2 tagging/release happens after that PR merges to `main`.
 
 Already exists (don't rebuild):
 - Full composite action (`action.yml`) with 20 steps — orchestration complete, regression wiring fixed 2026-06-10
@@ -101,8 +103,10 @@ Tasks:
 
 **Goal:** Tagged v1 release published to GitHub Marketplace; action usable via `@v1` by anyone.
 **Sessions:** 1 | **Risk:** Low
+**Precondition:** PR #3 (M1) merged to `main` — tags must point at a `main` commit.
 
 Tasks:
+- [ ] Run the action end-to-end on a real pytest-benchmark suite (dogfood workflow or scratch repo) — release criterion; never possible before the 2026-06-10 YAML fix
 - [ ] Add `branding:` block to `action.yml` (`icon: activity`, `color: purple`) — Marketplace requirement
 - [ ] Final review of `action.yml`, scripts, README for any rough edges
 - [ ] Create and push `v1.0.0` git tag: `git tag v1.0.0 && git push origin v1.0.0`
@@ -126,5 +130,5 @@ M1 (tests + docs) → M2 (tag + release)
 
 | Milestone | Status | Sessions Used | Estimate |
 |-----------|--------|---------------|----------|
-| M1 | **COMPLETE** (2026-06-10) | 1 | 1–2 |
-| M2 | NOT STARTED | 0 | 1 |
+| M1 | **COMPLETE** — shipped as PR #3, awaiting merge | 1 | 1–2 |
+| M2 | NOT STARTED (blocked on PR #3 merge) | 0 | 1 |

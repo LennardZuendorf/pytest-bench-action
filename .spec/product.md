@@ -2,7 +2,7 @@
 type: entrypoint
 scope: product
 children: []
-updated: 2026-06-10
+updated: 2026-06-11
 ---
 
 # pytest-bench-action — Product
@@ -67,7 +67,8 @@ Python library or application maintainers running pytest who want continuous per
 A release is ready when ALL of the following are true.
 
 ### Functionality
-- [x] Composite action runs end-to-end on a real pytest-benchmark suite
+- [ ] Composite action runs end-to-end on a real pytest-benchmark suite — **needs re-validation**: `action.yml` was invalid YAML until the 2026-06-10 fixes, so no prior end-to-end run was possible
+- [x] Regressions fail the job, after the PR comment and artifact are published (2026-06-10)
 - [x] Baseline save/load/list works correctly
 - [x] Comparison detects regressions and new/missing benchmarks
 - [x] PR comment posts and deduplicates correctly
