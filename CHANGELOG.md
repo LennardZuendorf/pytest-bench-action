@@ -18,8 +18,14 @@ First public release.
 - Final fail-on-regression step: the job fails *after* the PR comment and artifact are published
 - Outputs: `regression-detected`, `baseline-updated`, `node`
 - Benchmark results uploaded as workflow artifact (30-day retention)
+- Marketplace `branding` (icon `activity`, colour `purple`)
 - Test suite for both helper scripts (`python -m pytest tests/`)
 - Reference workflow in `docs/example-workflow.yml`
+- **Self-test / dogfood harness:** a real `pytest-benchmark` suite (`bench/`),
+  a captured real-output fixture, a local end-to-end harness
+  (`scripts/selftest.sh`) that drives the full pipeline against actual
+  pytest-benchmark JSON, and CI workflows (`.github/workflows/ci.yml` for unit
+  tests + self-test, `.github/workflows/benchmark.yml` dogfooding `uses: ./`)
 
 ### Fixed (pre-release hardening, 2026-06-10)
 
@@ -27,6 +33,12 @@ First public release.
 - Exit-code capture in the compare and check-update steps was dead code under GitHub's `bash -e` default; a regression aborted the run before the PR comment, and baseline drift on push events failed the job instead of triggering an update
 - Regressions now actually fail the job (previously only reported via output)
 - Helper scripts marked executable
+- Cross-branch comparison no longer assumes the base branch is `main`: uses the
+  PR's real `base_ref`, a dedicated scratch file, and a base-ref-labelled comment
+- All script file I/O uses explicit `encoding="utf-8"` (non-ASCII test ids safe
+  regardless of runner locale)
+- Proved end-to-end against real pytest-benchmark 5.x output, not just
+  hand-written fixtures
 
 ### Known limitations
 

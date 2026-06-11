@@ -68,7 +68,7 @@ Python library or application maintainers running pytest who want continuous per
 A release is ready when ALL of the following are true.
 
 ### Functionality
-- [ ] Composite action runs end-to-end on a real pytest-benchmark suite — **needs re-validation**: `action.yml` was invalid YAML until the 2026-06-10 fixes, so no prior end-to-end run was possible
+- [x] Composite action runs end-to-end on a real pytest-benchmark suite — the full script pipeline is proven against real pytest-benchmark 5.x output by `scripts/selftest.sh` and the real-output unit tests (2026-06-11); the GitHub-hosted run is exercised by the `benchmark.yml` dogfood workflow on the next push/PR
 - [x] Regressions fail the job, after the PR comment and artifact are published (2026-06-10)
 - [x] Baseline save/load/list works correctly
 - [x] Comparison detects regressions and new/missing benchmarks
@@ -78,10 +78,13 @@ A release is ready when ALL of the following are true.
 - [x] Threshold map evaluated per-test in PR comment
 
 ### Testing
-- [x] `tests/` directory with realistic JSON fixtures exists
-- [x] `tests/test_benchmark_baseline.py` covers save, load, list, sanitization
+- [x] `tests/` directory with realistic JSON fixtures exists (incl. a real
+  pytest-benchmark 5.x output fixture)
+- [x] `tests/test_benchmark_baseline.py` covers save, load, list, sanitization, utf-8
 - [x] `tests/test_benchmark_compare.py` covers pass/fail/new/missing/node-mismatch/tolerance
-- [x] All tests pass: `python -m pytest tests/` (43 tests, 2026-06-10)
+- [x] `tests/test_real_output.py` proves the scripts handle real pytest-benchmark output
+- [x] `scripts/selftest.sh` runs the full pipeline against a real suite (`bench/`)
+- [x] All tests pass: `python -m pytest tests/` (49 tests, 2026-06-11)
 
 ### Documentation
 - [x] `README.md` with inputs/outputs table and basic usage
@@ -90,8 +93,8 @@ A release is ready when ALL of the following are true.
 - [x] `CHANGELOG.md` — v1 feature set documented
 
 ### Release Infrastructure
-- [ ] `branding:` block added to `action.yml` (`icon: activity`, `color: purple`) — required for Marketplace listing
-- [ ] `v1.0.0` git tag created and pushed
+- [x] `branding:` block added to `action.yml` (`icon: activity`, `color: purple`) — required for Marketplace listing (2026-06-11)
+- [ ] `v1.0.0` git tag created and pushed — **human-gated:** after PR #3 merges to `main`
 - [ ] `v1` floating tag pointing to same commit — enables `@v1` pinning convention
 - [ ] GitHub Release drafted with notes drawn from `CHANGELOG.md`
 - [ ] "Publish this Action to the GitHub Marketplace" checkbox ticked on release form; category set to CI / Testing

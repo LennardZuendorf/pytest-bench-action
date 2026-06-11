@@ -3,7 +3,7 @@ type: feature-product
 scope: product
 feature: python-scripts
 parent: ../../product.md
-updated: 2026-06-06
+updated: 2026-06-11
 ---
 
 # python-scripts — Product
@@ -21,15 +21,21 @@ The Python scripts are the stdlib-only engine behind pytest-bench-action. They h
 - Exit codes as the primary API: 0 = pass/no-change, 1 = fail/update-needed
 - Graceful handling of missing files, malformed JSON, and mismatched nodes
 
-## Test Fixtures Needed
+## Test Fixtures (as built)
 
-For `tests/fixtures/`:
+`tests/fixtures/` holds a small set of committed fixtures; the rarer cases are
+constructed in-test via the `write_json` / `make_results` helpers in
+`tests/conftest.py` (keeps the fixture set minimal and the edge cases explicit).
 
-| File | Purpose |
-|------|---------|
-| `baseline.json` | Clean baseline with 3–5 benchmarks |
-| `results_pass.json` | All benchmarks within tolerance |
-| `results_regression.json` | One benchmark exceeds tolerance |
-| `results_new_benchmark.json` | Adds a benchmark not in baseline |
-| `results_missing_benchmark.json` | Drops a benchmark from baseline |
-| `results_wrong_node.json` | Different `machine_info.node` than baseline |
+| File / source | Purpose |
+|---------------|---------|
+| `baseline.json` | Clean baseline (committed) |
+| `results.json` | All benchmarks within tolerance (committed) |
+| `results_regression.json` | One benchmark exceeds tolerance (committed) |
+| `results_new_benchmark.json` | Adds a benchmark not in baseline (committed) |
+| `real_results.json` | **Real** pytest-benchmark 5.x output, full schema (committed) |
+| missing-benchmark case | built in-test (drop a benchmark) |
+| wrong-node case | built in-test (`make_results(node=...)`) |
+
+Real-output validation and the dogfood harness live in the
+[self-test-ci](../self-test-ci/product.md) feature.

@@ -112,9 +112,9 @@ Tasks:
 **Precondition:** PR #3 (M1) merged to `main` — tags must point at a `main` commit.
 
 Tasks:
-- [ ] Run the action end-to-end on a real pytest-benchmark suite (dogfood workflow or scratch repo) — release criterion; never possible before the 2026-06-10 YAML fix
-- [ ] Add `branding:` block to `action.yml` (`icon: activity`, `color: purple`) — Marketplace requirement
-- [ ] Final review of `action.yml`, scripts, README for any rough edges
+- [x] Run the action end-to-end on a real pytest-benchmark suite — done via M1.5: `scripts/selftest.sh` + real-output tests prove the pipeline locally; `benchmark.yml` dogfoods the full action on CI
+- [x] Add `branding:` block to `action.yml` (`icon: activity`, `color: purple`) — Marketplace requirement (2026-06-11)
+- [x] Final review of `action.yml`, scripts, README for any rough edges — subagent review 2026-06-11; fixes applied (base-branch handling, utf-8 I/O), non-issues confirmed
 - [ ] Create and push `v1.0.0` git tag: `git tag v1.0.0 && git push origin v1.0.0`
 - [ ] Create and push `v1` floating tag: `git tag -f v1 v1.0.0 && git push origin v1 --force`
 - [ ] Draft GitHub Release from `v1.0.0` tag with notes from `CHANGELOG.md`
@@ -136,5 +136,6 @@ M1 (tests + docs) → M2 (tag + release)
 
 | Milestone | Status | Sessions Used | Estimate |
 |-----------|--------|---------------|----------|
-| M1 | **COMPLETE** — shipped as PR #3, awaiting merge | 1 | 1–2 |
-| M2 | NOT STARTED (blocked on PR #3 merge) | 0 | 1 |
+| M1 | **COMPLETE** — shipped on PR #3 | 1 | 1–2 |
+| M1.5 | **COMPLETE** — dogfood harness + CI, real end-to-end validation (2026-06-11) | 1 | 1 |
+| M2 | In progress — branding done; tags/release/Marketplace human-gated on PR #3 merge | 0 | 1 |

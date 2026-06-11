@@ -74,3 +74,26 @@ The action checks out your repository itself (`fetch-depth: 2`); you don't need 
 **`python-version` not available on the runner.** The default tracks the latest stable Python (currently `"3.14"`). On older runner images, pin `python-version: "3.12"` or `"3.13"`.
 
 **Job fails with "Performance regression detected".** Working as intended — one or more benchmarks exceeded `cross-branch-tolerance` vs the baseline, or a benchmark present in the baseline is missing from the run. The PR comment and the step log contain the full comparison table.
+
+**My default branch isn't `main`.** Supported. The cross-branch comparison uses the PR's actual base branch (`github.base_ref`), and the PR comment is labelled accordingly. You just need a baseline committed on that branch (it appears after the first push to it).
+
+## Development
+
+This repo dogfoods itself.
+
+```bash
+# Unit tests for the helper scripts (needs pytest + pytest-benchmark)
+python -m pytest tests/ -v
+
+# End-to-end harness: runs the sample suite in bench/ and drives the full
+# pipeline (run -> extract node -> compare -> save -> list -> regression)
+# against real pytest-benchmark output. No GitHub required.
+sh scripts/selftest.sh
+```
+
+- `bench/test_sample_benchmark.py` — a small, deterministic, stdlib-only
+  pytest-benchmark suite used to exercise the action end-to-end.
+- `.github/workflows/ci.yml` — runs the unit tests and the self-test on every
+  push and PR.
+- `.github/workflows/benchmark.yml` — runs the action against `bench/` via
+  `uses: ./`, proving the full composite-action wiring on a real runner.
