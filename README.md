@@ -97,3 +97,5 @@ sh scripts/selftest.sh
   push and PR.
 - `.github/workflows/benchmark.yml` — runs the action against `bench/` via
   `uses: ./`, proving the full composite-action wiring on a real runner.
+- `.github/workflows/release.yml` — one-click, test-gated release (tags +
+  draft GitHub Release). See [docs/RELEASING.md](docs/RELEASING.md).

@@ -55,9 +55,9 @@ Must build (release gates):
 - **Both regression gates use `cross-branch-tolerance`:** the sequential (vs HEAD~1) comparison also gates at 20%, matching the implementation. `update-tolerance` is only the baseline-update trigger, never a failure gate — 5% would be too noisy for failing CI. (Documented 2026-06-10.)
 
 ### To Resolve
-- [ ] Should the action support `windows-latest` / `macos-latest` runners, or Linux-only for v1?
+- [x] Runner support — **resolved 2026-06-11: Linux-only for v1.** Already listed under Known Limitations; the suite and harness are POSIX-validated on Linux only. Windows/macOS stay Post-v1 Candidates.
 - [x] Default `python-version` — **resolved 2026-06-10: track latest stable Python (currently `"3.14"`)**; README documents pinning `"3.12"`/`"3.13"` on older runner images
-- [ ] Should integration tests run in CI (self-hosted or GitHub-hosted) as part of the release gate?
+- [x] Integration tests in CI as release gate — **resolved 2026-06-11: yes.** `ci.yml` runs unit tests + selftest on every push/PR, and `release.yml` re-runs both before tagging, so nothing untested can be released.
 
 ---
 
@@ -115,12 +115,11 @@ Tasks:
 - [x] Run the action end-to-end on a real pytest-benchmark suite — done via M1.5: `scripts/selftest.sh` + real-output tests prove the pipeline locally; `benchmark.yml` dogfoods the full action on CI
 - [x] Add `branding:` block to `action.yml` (`icon: activity`, `color: purple`) — Marketplace requirement (2026-06-11)
 - [x] Final review of `action.yml`, scripts, README for any rough edges — subagent review 2026-06-11; fixes applied (base-branch handling, utf-8 I/O), non-issues confirmed
-- [ ] Create and push `v1.0.0` git tag: `git tag v1.0.0 && git push origin v1.0.0`
-- [ ] Create and push `v1` floating tag: `git tag -f v1 v1.0.0 && git push origin v1 --force`
-- [ ] Draft GitHub Release from `v1.0.0` tag with notes from `CHANGELOG.md`
-- [ ] Tick "Publish this Action to the GitHub Marketplace" on the release form; set category to CI / Testing
-- [ ] Verify Marketplace listing is live and `uses: lennardzuendorf/pytest-bench-action@v1` resolves
-- [ ] Optional: add CI workflow (`.github/workflows/ci.yml`) to run tests on every push
+- [x] Automate the mechanical release steps: `.github/workflows/release.yml` (manual `workflow_dispatch` from `main`, runs unit tests + selftest first, then creates the `vX.Y.Z` tag, force-moves the floating major tag, and drafts a GitHub Release with notes extracted from `CHANGELOG.md`); runbook in `docs/RELEASING.md` (2026-06-11)
+- [ ] **Human, after PR #3 merges:** run the Release workflow from `main` with `version: v1.0.0` → creates `v1.0.0` + `v1` tags and the draft Release
+- [ ] **Human:** publish the draft Release; tick "Publish this Action to the GitHub Marketplace"; set category to CI / Testing
+- [ ] **Human:** verify Marketplace listing is live and `uses: lennardzuendorf/pytest-bench-action@v1` resolves
+- [x] CI workflow (`.github/workflows/ci.yml`) to run tests on every push (2026-06-11, M1.5)
 
 **Done when:** Action appears on GitHub Marketplace and resolves correctly in a real repo's workflow.
 
@@ -128,7 +127,15 @@ Tasks:
 
 ## Critical Path
 
-M1 (tests + docs) → M2 (tag + release)
+M1 (tests + docs) → M1.5 (dogfood + CI) → M2 (tag + release)
+
+## Spec Lifecycle
+
+Per the spec skill, feature folders are ephemeral: compound to root, then move to
+`.spec/archive/<name>/`. All three features (`composite-action`, `python-scripts`,
+`self-test-ci`) have had their cross-cutting decisions merged into root
+`tech.md` / `lessons.md`; the folders stay live as implementation references
+until v1 ships, then archive as part of M2 wrap-up (post PR #3 merge).
 
 ---
 

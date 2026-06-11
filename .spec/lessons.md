@@ -41,6 +41,9 @@ Bare `open()` / `Path.read_text()` use the locale encoding, which is not guarant
 ### 10. Don't hardcode `main` as the base branch
 The cross-branch comparison uses `github.base_ref`, and a repo's default branch may not be `main`. The scratch baseline file is `_cross_baseline.json` (not a branch name) and the PR-comment label uses the real base ref. "Works with any suite, zero friction" includes repos that don't call their integration branch `main`.
 
+### 11. Never template-expand workflow inputs into `run:` scripts
+`${{ github.event.inputs.x }}` inside a `run:` block is string-substituted before the shell sees it — a crafted input is shell injection, and it executes *before* any in-script validation. Route inputs through `env:` (`env: VERSION: ${{ inputs.version }}`) and reference `"$VERSION"` in the script. Applied in `release.yml`.
+
 ---
 
 ## Design Decisions That Felt Weird But Are Correct

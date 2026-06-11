@@ -94,12 +94,10 @@ A release is ready when ALL of the following are true.
 
 ### Release Infrastructure
 - [x] `branding:` block added to `action.yml` (`icon: activity`, `color: purple`) — required for Marketplace listing (2026-06-11)
-- [ ] `v1.0.0` git tag created and pushed — **human-gated:** after PR #3 merges to `main`
-- [ ] `v1` floating tag pointing to same commit — enables `@v1` pinning convention
-- [ ] GitHub Release drafted with notes drawn from `CHANGELOG.md`
-- [ ] "Publish this Action to the GitHub Marketplace" checkbox ticked on release form; category set to CI / Testing
-- [ ] Marketplace listing verified live
-- [ ] Action reachable via `uses: lennardzuendorf/pytest-bench-action@v1`
+- [x] Release automation: `.github/workflows/release.yml` (test-gated tags + draft Release from CHANGELOG) and `docs/RELEASING.md` runbook (2026-06-11)
+- [ ] `v1.0.0` git tag + `v1` floating tag — **one workflow run** after PR #3 merges (Actions → Release → `version: v1.0.0`)
+- [ ] GitHub Release published; "Publish this Action to the GitHub Marketplace" ticked; category CI / Testing — **manual by design** (requires 2FA + Marketplace Developer Agreement, see RELEASING.md)
+- [ ] Marketplace listing verified live; `uses: lennardzuendorf/pytest-bench-action@v1` resolves
 
 ---
 

@@ -26,6 +26,10 @@ First public release.
   (`scripts/selftest.sh`) that drives the full pipeline against actual
   pytest-benchmark JSON, and CI workflows (`.github/workflows/ci.yml` for unit
   tests + self-test, `.github/workflows/benchmark.yml` dogfooding `uses: ./`)
+- **Release automation:** `.github/workflows/release.yml` (manual dispatch from
+  `main`; re-runs all tests, creates the version tag, moves the floating major
+  tag, drafts a GitHub Release from this changelog) plus the
+  `docs/RELEASING.md` runbook
 
 ### Fixed (pre-release hardening, 2026-06-10)
 

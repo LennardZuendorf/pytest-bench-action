@@ -40,7 +40,10 @@ Validatable steps, each with its own checkpoint. Maps to master-plan Phases A–
 
 ## Done when
 
-- `bash scripts/selftest.sh` exits 0 against real output.
-- `python -m pytest tests/` green (incl. real-output test).
-- Both workflows valid and reviewed.
-- Feature ready to compound into root specs (Phase D).
+- [x] `bash scripts/selftest.sh` exits 0 against real output.
+- [x] `python -m pytest tests/` green (incl. real-output test).
+- [x] Both workflows valid and reviewed.
+- [x] Feature compounded into root specs (Phase D, 2026-06-11).
+
+**FEATURE COMPLETE 2026-06-11.** Archives to `.spec/archive/self-test-ci/` at v1
+wrap-up (see root plan, "Spec Lifecycle").
