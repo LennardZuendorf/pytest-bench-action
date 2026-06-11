@@ -35,6 +35,7 @@ Python library or application maintainers running pytest who want continuous per
 | **PR comment with results table** | P0 | [features/composite-action/](features/composite-action/product.md) |
 | **Per-test threshold map** | P1 | [features/composite-action/](features/composite-action/product.md) |
 | **Integration test suite** | P0 (release gate) | See Release Criteria below |
+| **Self-test / dogfood CI** | P0 (release gate) | [features/self-test-ci/](features/self-test-ci/product.md) |
 | **Example workflow** | P1 | See Release Criteria below |
 
 ## Implementation Phases

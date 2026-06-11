@@ -81,3 +81,4 @@ pytest-bench-action/
 |---------|--------|
 | **[features/composite-action/](features/composite-action/tech.md)** | action.yml step-by-step logic, conditional wiring, input/output contracts |
 | **[features/python-scripts/](features/python-scripts/tech.md)** | Script internals: baseline format, comparison algorithm, exit codes, test fixtures |
+| **[features/self-test-ci/](features/self-test-ci/tech.md)** | Dogfood harness, sample benchmark suite, real-output fixtures, CI workflows |

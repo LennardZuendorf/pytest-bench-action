@@ -66,7 +66,13 @@ Must build (release gates):
 | Milestone | Goal | Sessions | Risk |
 |-----------|------|----------|------|
 | **M1** | Release hardening — tests, docs, changelog | 1–2 | Low |
+| **M1.5** | Self-test / dogfood — real end-to-end validation, CI | 1 | Low |
 | **M2** | v1 release — tag, GitHub release, announce | 1 | Low |
+
+**M1.5** is detailed in [features/self-test-ci/plan.md](features/self-test-ci/plan.md):
+build a real benchmark suite, validate the full pipeline against actual
+pytest-benchmark output (closing the open "end-to-end" release criterion), and
+add CI + dogfood workflows. Runs between M1 and M2.
 
 ---
 
