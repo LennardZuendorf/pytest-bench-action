@@ -2,6 +2,10 @@ name: pytest-bench-action
 description: Run pytest-benchmark, manage per-branch baselines, and post PR comparison comments.
 author: lennardzuendorf
 
+branding:
+  icon: activity
+  color: purple
+
 inputs:
   python-version:
     description: Python version for consistent benchmarks
@@ -109,7 +113,9 @@ runs:
       run: |
         TARGET_BRANCH="${{ github.base_ref }}"
         SANITIZED_TARGET=$(echo "${TARGET_BRANCH}" | tr '/\\. ' '_')
-        BASELINE_PATH="${{ inputs.baselines-dir }}/main.json"
+        # Dedicated scratch file (not a branch name) so we never clobber a
+        # committed baseline, whatever the base branch is called.
+        BASELINE_PATH="${{ inputs.baselines-dir }}/_cross_baseline.json"
 
         git show "origin/${TARGET_BRANCH}:${{ inputs.baselines-dir }}/${SANITIZED_TARGET}.json" \
           > "${BASELINE_PATH}" 2>/dev/null || true
@@ -120,7 +126,7 @@ runs:
         else
           echo "main_baseline_exists=false" >> "$GITHUB_OUTPUT"
           rm -f "${BASELINE_PATH}"
-          echo "No main branch baseline found — skipping cross-branch comparison."
+          echo "No baseline found for base branch '${TARGET_BRANCH}' — skipping cross-branch comparison."
         fi
 
     - name: Load previous-commit baseline
@@ -173,12 +179,12 @@ runs:
       id: compare-main
       run: |
         SCRIPT_DIR="${{ github.action_path }}/scripts"
+        EXIT_CODE=0
         python "${SCRIPT_DIR}/benchmark_compare.py" compare-json \
           "${{ steps.load-main-baseline.outputs.main_baseline_path }}" \
           "${{ inputs.benchmark-results-file }}" \
           --tolerance="${{ inputs.cross-branch-tolerance }}" \
-          > "${{ inputs.baselines-dir }}/main_comparison.txt" 2>&1
-        EXIT_CODE=$?
+          > "${{ inputs.baselines-dir }}/main_comparison.txt" 2>&1 || EXIT_CODE=$?
         cat "${{ inputs.baselines-dir }}/main_comparison.txt"
         if [ $EXIT_CODE -ne 0 ]; then
           echo "main_regression=true" >> "$GITHUB_OUTPUT"
@@ -192,12 +198,12 @@ runs:
       id: compare-prev
       run: |
         SCRIPT_DIR="${{ github.action_path }}/scripts"
+        EXIT_CODE=0
         python "${SCRIPT_DIR}/benchmark_compare.py" compare-json \
           "${{ steps.load-prev-baseline.outputs.prev_baseline_path }}" \
           "${{ inputs.benchmark-results-file }}" \
           --tolerance="${{ inputs.cross-branch-tolerance }}" \
-          > "${{ inputs.baselines-dir }}/current_comparison.txt" 2>&1
-        EXIT_CODE=$?
+          > "${{ inputs.baselines-dir }}/current_comparison.txt" 2>&1 || EXIT_CODE=$?
         cat "${{ inputs.baselines-dir }}/current_comparison.txt"
         if [ $EXIT_CODE -ne 0 ]; then
           echo "prev_regression=true" >> "$GITHUB_OUTPUT"
@@ -217,12 +223,11 @@ runs:
           echo "should_update=true" >> "$GITHUB_OUTPUT"
           echo "No existing baseline — will create."
         else
-          python "${SCRIPT_DIR}/benchmark_compare.py" compare-json \
+          if python "${SCRIPT_DIR}/benchmark_compare.py" compare-json \
             "${BASELINE_FILE}" \
             "${{ inputs.benchmark-results-file }}" \
             --tolerance="${{ inputs.update-tolerance }}" \
-            > /dev/null 2>&1
-          if [ $? -eq 0 ]; then
+            > /dev/null 2>&1; then
             echo "should_update=false" >> "$GITHUB_OUTPUT"
             echo "Baseline within update tolerance — skipping update."
           else
@@ -277,6 +282,7 @@ runs:
         NODE: ${{ steps.extract-node.outputs.node }}
         PYTHON_VERSION: ${{ inputs.python-version }}
         CURRENT_BRANCH: ${{ steps.branch.outputs.current_branch }}
+        BASE_REF: ${{ github.base_ref }}
         RESULTS_FILE: ${{ inputs.benchmark-results-file }}
         THRESHOLD_MAP: ${{ inputs.threshold-map }}
         CROSS_BRANCH_TOLERANCE: ${{ inputs.cross-branch-tolerance }}
@@ -330,9 +336,10 @@ runs:
             try { prevComparison = fs.readFileSync(`${baseDir}/current_comparison.txt`, 'utf8'); } catch {}
           }
 
+          const baseRef = process.env.BASE_REF || 'base branch';
           const mainSection = process.env.MAIN_BASELINE_EXISTS === 'true'
-            ? `#### vs Main Branch Baseline (${process.env.CROSS_BRANCH_TOLERANCE}% tolerance)\n\`\`\`\n${mainComparison}\`\`\``
-            : `#### vs Main Branch Baseline\n_No baseline found for main branch — first run or baseline not yet committed._`;
+            ? `#### vs Base Branch \`${baseRef}\` (${process.env.CROSS_BRANCH_TOLERANCE}% tolerance)\n\`\`\`\n${mainComparison}\`\`\``
+            : `#### vs Base Branch \`${baseRef}\`\n_No baseline found for \`${baseRef}\` — first run or baseline not yet committed._`;
 
           const prevSection = process.env.PREV_BASELINE_EXISTS === 'true'
             ? `#### vs Current Branch Baseline (${process.env.CROSS_BRANCH_TOLERANCE}% tolerance)\n\`\`\`\n${prevComparison}\`\`\``
@@ -346,26 +353,29 @@ runs:
             ? `\n> ⚠️ **Regression detected** — one or more benchmarks exceeded tolerance.\n`
             : '';
 
-          const body = `## 📊 Performance Benchmark Results
-
-**Node:** ${process.env.NODE}
-**Python Version:** ${process.env.PYTHON_VERSION}
-**Branch:** ${process.env.CURRENT_BRANCH}
-${regressionNote}
-### Benchmark Results
-
-| Test | Mean Time | Threshold | Status |
-|------|-----------|-----------|--------|
-${tableRows}
-### Baseline Comparisons
-
-${mainSection}
-
-${prevSection}
-
----
-
-${updateNote}`;
+          const body = [
+            '## 📊 Performance Benchmark Results',
+            '',
+            `**Node:** ${process.env.NODE}`,
+            `**Python Version:** ${process.env.PYTHON_VERSION}`,
+            `**Branch:** ${process.env.CURRENT_BRANCH}`,
+            regressionNote,
+            '### Benchmark Results',
+            '',
+            '| Test | Mean Time | Threshold | Status |',
+            '|------|-----------|-----------|--------|',
+            tableRows.trimEnd(),
+            '',
+            '### Baseline Comparisons',
+            '',
+            mainSection,
+            '',
+            prevSection,
+            '',
+            '---',
+            '',
+            updateNote,
+          ].join('\n');
 
           // Deduplicate: delete previous bot comment
           const { data: comments } = await github.rest.issues.listComments({
@@ -396,3 +406,10 @@ ${updateNote}`;
         name: benchmark-results-${{ github.run_number }}
         path: ${{ inputs.benchmark-results-file }}
         retention-days: 30
+
+    - name: Fail on regression
+      if: steps.set-outputs.outputs.regression-detected == 'true'
+      shell: bash
+      run: |
+        echo "::error::Performance regression detected — one or more benchmarks exceeded tolerance. See the comparison output above."
+        exit 1

@@ -1,0 +1,50 @@
+# Reference workflow for pytest-bench-action.
+# Copy into your repo as .github/workflows/benchmark.yml and adjust the
+# setup/benchmark commands to your project.
+#
+# Notes:
+# - The action performs its own checkout (fetch-depth: 2); you do NOT need
+#   an actions/checkout step before it.
+# - contents:write is needed to commit baselines on push events;
+#   pull-requests:write is needed to post the PR comment.
+# - Baselines are tied to the runner's hostname (machine_info.node).
+#   Use a consistent runner (ideally self-hosted) for meaningful comparisons.
+
+name: Benchmarks
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  benchmark:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Run benchmarks and compare against baselines
+        id: bench
+        uses: lennardzuendorf/pytest-bench-action@v1
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          python-version: "3.14"
+          setup-command: pip install -e ".[dev]"
+          benchmark-run-command: >
+            pytest tests/benchmarks
+            --benchmark-only
+            --benchmark-json=benchmark-results.json
+            -v
+          cross-branch-tolerance: 20
+          update-tolerance: 5
+          threshold-map: '{"e2e_create": 30.0, "e2e_search": 5.0, "help": 0.5}'
+
+      # Outputs are available to later steps, e.g. for custom notifications:
+      - name: Show outcome
+        if: always()
+        run: |
+          echo "regression-detected: ${{ steps.bench.outputs.regression-detected }}"
+          echo "baseline-updated:    ${{ steps.bench.outputs.baseline-updated }}"
+          echo "node:                ${{ steps.bench.outputs.node }}"

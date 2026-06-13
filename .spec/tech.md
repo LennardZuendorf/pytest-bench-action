@@ -2,7 +2,7 @@
 type: entrypoint
 scope: technical
 children: []
-updated: 2026-06-06
+updated: 2026-06-10
 ---
 
 # pytest-bench-action — Technical Architecture
@@ -19,11 +19,26 @@ updated: 2026-06-06
 
 ```
 pytest-bench-action/
-├── action.yml                  # Composite action — 19 steps, all orchestration lives here
+├── action.yml                  # Composite action — 20 steps, all orchestration lives here
 ├── scripts/
 │   ├── benchmark_baseline.py   # save | load | list commands (stdlib only)
-│   └── benchmark_compare.py    # compare-json command (stdlib only)
+│   ├── benchmark_compare.py    # compare-json command (stdlib only)
+│   └── selftest.sh             # local end-to-end harness (mirrors action.yml pipeline)
+├── bench/
+│   └── test_sample_benchmark.py # deterministic stdlib suite for dogfooding
+├── tests/
+│   ├── conftest.py             # subprocess/json helpers
+│   ├── fixtures/               # hand-written + captured real pytest-benchmark output
+│   └── test_*.py               # 49 unit tests incl. real-output validation
+├── .github/workflows/
+│   ├── ci.yml                  # unit tests + selftest on push/PR
+│   ├── benchmark.yml           # dogfood: uses: ./ against bench/
+│   └── release.yml             # manual: gate tests → tags → draft Release
+├── docs/
+│   ├── example-workflow.yml    # caller reference workflow
+│   └── RELEASING.md            # release runbook
 ├── .spec/                      # Design docs (this directory)
+├── CHANGELOG.md                # release notes (source for release.yml)
 ├── README.md                   # User-facing usage guide
 ├── AGENTS.md / CLAUDE.md       # Engineering guidelines (symlinked)
 └── LICENSE                     # MIT
@@ -81,3 +96,4 @@ pytest-bench-action/
 |---------|--------|
 | **[features/composite-action/](features/composite-action/tech.md)** | action.yml step-by-step logic, conditional wiring, input/output contracts |
 | **[features/python-scripts/](features/python-scripts/tech.md)** | Script internals: baseline format, comparison algorithm, exit codes, test fixtures |
+| **[features/self-test-ci/](features/self-test-ci/tech.md)** | Dogfood harness, sample benchmark suite, real-output fixtures, CI workflows |

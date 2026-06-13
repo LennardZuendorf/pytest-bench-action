@@ -2,7 +2,7 @@
 type: entrypoint
 scope: product
 children: []
-updated: 2026-06-09
+updated: 2026-06-11
 ---
 
 # pytest-bench-action — Product
@@ -47,14 +47,16 @@ Python library or application maintainers running pytest who want continuous per
 
 ---
 
-## Features
-
-| Feature | Covers |
-|---|---|
-| **[composite-action](features/composite-action/product.md)** | The `action.yml` interface — inputs/outputs, event-aware steps, PR comment, baseline commit, threshold map |
-| **[python-scripts](features/python-scripts/product.md)** | Stdlib-only baseline management and the comparison engine, plus their test suite |
-
----
+| Feature | Priority | Details in |
+|---------|----------|------------|
+| **Composite action definition** (`action.yml`) | P0 | [features/composite-action/](features/composite-action/product.md) |
+| **Baseline management** (`benchmark_baseline.py`) | P0 | [features/python-scripts/](features/python-scripts/product.md) |
+| **Comparison engine** (`benchmark_compare.py`) | P0 | [features/python-scripts/](features/python-scripts/product.md) |
+| **PR comment with results table** | P0 | [features/composite-action/](features/composite-action/product.md) |
+| **Per-test threshold map** | P1 | [features/composite-action/](features/composite-action/product.md) |
+| **Integration test suite** | P0 (release gate) | See Release Criteria below |
+| **Self-test / dogfood CI** | P0 (release gate) | [features/self-test-ci/](features/self-test-ci/product.md) |
+| **Example workflow** | P1 | See Release Criteria below |
 
 ## Implementation Phases
 
@@ -77,13 +79,41 @@ Release-gate sequencing and status live in [plan.md](plan.md).
 
 ---
 
-## Non-Goals
+## v1 Release Criteria
 
-- Cross-machine baseline comparison (explicitly blocked)
-- Support for non-pytest benchmark runners
-- External storage or third-party benchmark services
-- Historical trending dashboards or charts
-- Slack / webhook notifications
+A release is ready when ALL of the following are true.
+
+### Functionality
+- [x] Composite action runs end-to-end on a real pytest-benchmark suite — the full script pipeline is proven against real pytest-benchmark 5.x output by `scripts/selftest.sh` and the real-output unit tests (2026-06-11); the GitHub-hosted run is exercised by the `benchmark.yml` dogfood workflow on the next push/PR
+- [x] Regressions fail the job, after the PR comment and artifact are published (2026-06-10)
+- [x] Baseline save/load/list works correctly
+- [x] Comparison detects regressions and new/missing benchmarks
+- [x] PR comment posts and deduplicates correctly
+- [x] Baseline commits include `[skip ci]`
+- [x] Node mismatch fails with a clear error message
+- [x] Threshold map evaluated per-test in PR comment
+
+### Testing
+- [x] `tests/` directory with realistic JSON fixtures exists (incl. a real
+  pytest-benchmark 5.x output fixture)
+- [x] `tests/test_benchmark_baseline.py` covers save, load, list, sanitization, utf-8
+- [x] `tests/test_benchmark_compare.py` covers pass/fail/new/missing/node-mismatch/tolerance
+- [x] `tests/test_real_output.py` proves the scripts handle real pytest-benchmark output
+- [x] `scripts/selftest.sh` runs the full pipeline against a real suite (`bench/`)
+- [x] All tests pass: `python -m pytest tests/` (49 tests, 2026-06-11)
+
+### Documentation
+- [x] `README.md` with inputs/outputs table and basic usage
+- [x] `README.md` troubleshooting section (first run, node mismatch, fork PRs, `[skip ci]`)
+- [x] `docs/example-workflow.yml` — complete reference workflow
+- [x] `CHANGELOG.md` — v1 feature set documented
+
+### Release Infrastructure
+- [x] `branding:` block added to `action.yml` (`icon: activity`, `color: purple`) — required for Marketplace listing (2026-06-11)
+- [x] Release automation: `.github/workflows/release.yml` (test-gated tags + draft Release from CHANGELOG) and `docs/RELEASING.md` runbook (2026-06-11)
+- [ ] `v1.0.0` git tag + `v1` floating tag — **one workflow run** after PR #3 merges (Actions → Release → `version: v1.0.0`)
+- [ ] GitHub Release published; "Publish this Action to the GitHub Marketplace" ticked; category CI / Testing — **manual by design** (requires 2FA + Marketplace Developer Agreement, see RELEASING.md)
+- [ ] Marketplace listing verified live; `uses: lennardzuendorf/pytest-bench-action@v1` resolves
 
 ---
 
