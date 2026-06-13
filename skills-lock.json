@@ -14,10 +14,10 @@
       "computedHash": "06050545ab9806fe70112cd01766cc75af541e7184846b1cffff1706ecba240d"
     },
     "spec": {
-      "source": "lennardzuendorf/vibe",
+      "source": "LennardZuendorf/vibe",
       "sourceType": "github",
       "skillPath": ".agents/skills/spec/SKILL.md",
-      "computedHash": "d421009cb2e0f9a8daf99d0255ecf3102a26e357b4314992c3e131a226df4db0"
+      "computedHash": "aec3d17dddebe23302d4292813dfa3ad809ecd29c2fff9e8c6244d43f30c7b1e"
     },
     "vibe-amend": {
       "source": "lennardzuendorf/vibe",
