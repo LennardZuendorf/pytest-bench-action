@@ -44,7 +44,7 @@ Must build (release gates):
 
 ---
 
-## Critical Architecture Decisions
+**Parent specs:** [product.md](product.md), [tech.md](tech.md)
 
 ### Decided
 - **Composite action, no Docker:** Faster startup, no container build. Python stdlib only in scripts.
@@ -61,7 +61,7 @@ Must build (release gates):
 
 ---
 
-## Implementation Roadmap
+## Feature Boundaries
 
 | Milestone | Goal | Sessions | Risk |
 |-----------|------|----------|------|
@@ -76,10 +76,10 @@ add CI + dogfood workflows. Runs between M1 and M2.
 
 ---
 
-## M1: Release Hardening
+## Feature Sequence
 
-**Goal:** All release-blocking gaps closed: test suite passes, docs complete, changelog written.
-**Sessions:** 1–2 | **Risk:** Low
+Single end goal, so the numbered feature list **is** the roadmap. Gates are
+binary: a feature starts only when its upstream is `DONE`.
 
 Tasks:
 - [x] **Task 0 — fix `action.yml` regression wiring** (found in 2026-06-10 audit; done, plus a bonus find: `action.yml` was invalid YAML — the PR-comment body template literal terminated the `script: |` block scalar; rebuilt as a joined line array):
@@ -101,7 +101,9 @@ Tasks:
 - [x] Mark `scripts/benchmark_baseline.py` and `scripts/benchmark_compare.py` executable (`chmod 755`)
 - [x] Validate action.yml for shell quoting / logic bugs — audit done 2026-06-10; findings folded into Task 0
 
-**Done when:** `python -m pytest tests/` exits 0, README has troubleshooting section, CHANGELOG exists.
+Both features' core artifacts ship; each has one open unit (`python-scripts/2`
+tests, `composite-action/2` branding). Cross-feature order is only here; feature
+plans declare same-feature unit deps only.
 
 ---
 
@@ -125,7 +127,7 @@ Tasks:
 
 ---
 
-## Critical Path
+Honest inventory of v1 release gaps. Close via the cited feature unit or release task.
 
 M1 (tests + docs) → M1.5 (dogfood + CI) → M2 (tag + release)
 
@@ -139,7 +141,7 @@ until v1 ships, then archive as part of M2 wrap-up (post PR #3 merge).
 
 ---
 
-## Progress
+## Current Focus
 
 | Milestone | Status | Sessions Used | Estimate |
 |-----------|--------|---------------|----------|

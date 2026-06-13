@@ -1,6 +1,6 @@
 # Strategy layer — global / long-living specs
 
-Root-layer files in `.spec/` are **persistent**. They describe the whole product and architecture at a level that does not dive into one feature's implementation detail. Feature-level detail lives under `.spec/features/<name>/` — see [feature.md](feature.md).
+Root-layer files in `.spec/` are **persistent in role, current in content**. They describe the whole product and architecture at a level that does not dive into one feature's implementation detail. The files persist; their content is kept current — delivered work in `plan.md` cleanses to a one-line note, and no long-horizon backlog is hoarded (that lives in an external tracker). Feature-level detail lives under `.spec/features/<name>/` — see [feature.md](feature.md).
 
 ## What lives at root
 
@@ -9,13 +9,13 @@ Root-layer files in `.spec/` are **persistent**. They describe the whole product
 | `product.md` | Mini PRD — story, requirements, principles, features index | Persistent |
 | `tech.md` | Architecture summary — stack, principles, contracts, features index | Persistent |
 | `design.md` | Cross-cutting design language, UX principles, interaction conventions | Persistent |
-| `plan.md` | Roadmap, milestones, progress | Persistent |
+| `plan.md` | Feature sequence (binary gates), feature map, current focus | Persistent file, current content |
 | `lessons.md` | Mistakes and rules — read at session start | Persistent, append-only |
 | `product-{topic}.md` | Cross-cutting product (design system, conventions) | Persistent |
 | `tech-{topic}.md` | Cross-cutting tech (infra, observability, deployment) | Persistent |
 | `plan-{topic}.md` | Cross-cutting sub-plan when main `plan.md` grows large | Persistent |
 
-**Root `product.md` / `tech.md`:** never feature-level detail. If you're describing how one feature works, you're in the wrong file — use `features/<name>/product.md` or `tech.md`.
+**Root `product.md` / `tech.md`:** stay high-level — see [SKILL.md](SKILL.md) § Strict Rules (rule 2) for the canonical boundary.
 
 ## Writing order
 
@@ -24,36 +24,26 @@ Step 1: product.md     — story / requirements / principles. Stay high-level.
         tech.md        — architecture / stack / basic implementation. Stay high-level.
         design.md      — shared UX/design language. Stay high-level.
 
-Step 2: For each sub-part (parallel or sequential):
-        features/<name>/product.md
+Step 2: For each feature (a closed, deliverable, testable box):
+        features/<name>/product.md   (include Scope: Owns / Does not own)
         features/<name>/tech.md
-        features/<name>/design.md (optional)
+        features/<name>/plan.md      (stable `<name>/n` units; same-feature deps only)
+        features/<name>/design.md    (optional)
 
 Step 3: Cross-cutting only — when a concern truly spans every feature:
         product-{topic}.md
         tech-{topic}.md
 
-Step 4: plan.md        — sequence features into milestones
+Step 4: plan.md        — feature table, Feature Sequence (binary gates), current focus
 ```
 
 **Order matters:** root entrypoints constrain everything; then feature folders; branch docs last and only when the cross-cutting concern is **real**, not anticipated.
 
-Templates: [reference/templates/product.md](reference/templates/product.md), [reference/templates/tech.md](reference/templates/tech.md), [reference/templates/plan.md](reference/templates/plan.md).
+Templates: [product](reference/templates/product.md), [tech](reference/templates/tech.md), [plan](reference/templates/plan.md), [feature-plan](reference/templates/feature-plan.md).
 
 ## Branch doc vs feature folder
 
-When content doesn't fit in root `product.md` / `tech.md`, ask:
-
-**"Does this describe one feature, or something that spans every feature?"**
-
-| Answer | Where it goes |
-|---|---|
-| One feature (buildable, named unit of work) | `.spec/features/<name>/{product,tech}.md` |
-| Spans every feature (design system, infra, conventions, observability) | `.spec/{product,tech}-{topic}.md` |
-
-If unsure, default to **feature**. Recurring patterns across features signal time to extract a branch doc.
-
-A branch doc is **not** a feature with extra steps.
+When content doesn't fit in root entrypoints, use the two-layer decision in [SKILL.md](SKILL.md) § The Two-Layer Model and § Strategy vs Feature. Default to `features/<name>/`; extract to branch docs only when a concern truly spans every feature.
 
 ## Product vs Tech — the hard line
 
@@ -87,7 +77,9 @@ Full guides: [reference/product.md](reference/product.md), [reference/tech.md](r
 
 ## Plans and sub-plans
 
-`plan.md` is the **project-level** roadmap. It sequences features and milestones. It does **not** contain feature-level task lists — those go in `features/<name>/plan.md` (optional) or in the feature's `tech.md`.
+**Two-tier planning:** root `plan.md` = feature boundaries, Feature Sequence with **binary whole-feature gates** (upstream DONE before downstream starts), current focus. `features/<name>/plan.md` = unit tables (`<name>/n`), **same-feature** dependencies, verification. Never duplicate unit tables in the root plan; cross-feature order lives only in the root Feature Sequence.
+
+Unit IDs are `<name>/n` — assigned once, never renumbered on reorder (add a new `<name>/n` for new work). Cite in commits and tests during `impl`.
 
 `plan-{topic}.md` is for genuinely **cross-cutting** plans that don't belong to one feature (e.g. a migration touching every feature). Rare. Default to feature-scoped plans.
 
@@ -114,7 +106,7 @@ Guide: [reference/plan.md](reference/plan.md).
 
 ## Promotion from feature layer (COMPOUND)
 
-During **COMPOUND**, cross-cutting decisions from `features/<name>/tech.md` merge into root `tech.md` (or a branch `tech-{topic}.md`). Feature-specific detail does **not** merge — it stays in the folder when it moves to `archive/<name>/`.
+During **COMPOUND**, cross-cutting decisions from `features/<name>/tech.md` merge into root `tech.md` (or a branch `tech-{topic}.md`). Feature-specific detail does **not** merge. Then move `features/<name>/` to `archive/` as a transient safety net; the agent prompts to delete it after validation, before the branch merges. CODE IS TRUTH — archive is never read for active work. See [SKILL.md](SKILL.md) § Wrapped-up features.
 
 **How to mark promotable blocks** in feature `tech.md`: wrap sections in `<!-- merge -->` ... `<!-- /merge -->`, or use frontmatter `merge: true` where your project's merge tooling expects it (see root `tech.md` for `merge-feature.sh` behavior if documented in your repo).
 

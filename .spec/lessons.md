@@ -1,11 +1,12 @@
 ---
 type: lessons
-updated: 2026-06-10
+updated: 2026-06-09
 ---
 
 # pytest-bench-action — Lessons & Gotchas
 
-Read this at the start of each session to avoid repeating past mistakes.
+Mistakes made and rules to prevent repeating them. Review at the start of every
+session. Tags make entries retrievable — scan for tags matching the work in hand.
 
 ---
 
@@ -48,6 +49,6 @@ The cross-branch comparison uses `github.base_ref`, and a repo's default branch 
 
 ## Design Decisions That Felt Weird But Are Correct
 
-- **Two tolerance inputs** (`cross-branch-tolerance` vs `update-tolerance`): The first is for catching regressions on PRs; the second is for deciding when to update the baseline. They serve different purposes. Merging them into one caused false baseline churn in early iterations.
-- **Deleting the old PR comment before posting a new one**: Just updating the existing comment leaves stale results if the benchmark set changes. Deleting + creating is cleaner and avoids race conditions with the old comment body.
-- **Stripping `data` arrays on baseline save**: pytest-benchmark stores every individual sample in `data`. For a 100-round benchmark this can be 100 floats. We only need the aggregates (`mean`, `median`, etc.). Stripping reduces file size by ~99%.
+- **Two tolerance inputs** (`cross-branch-tolerance` vs `update-tolerance`): the first catches regressions on PRs; the second decides when to update the baseline. Merging them caused false baseline churn in early iterations.
+- **Deleting the old PR comment before posting a new one**: just editing the existing comment leaves stale results when the benchmark set changes. Delete + create is cleaner and avoids races with the old body.
+- **Stripping `data` arrays on baseline save**: pytest-benchmark stores every sample in `data`. We only need the aggregates (`mean`, `median`, …); stripping reduces file size by ~99%.

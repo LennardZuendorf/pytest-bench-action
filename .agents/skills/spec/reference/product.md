@@ -8,7 +8,7 @@ There are three places product content goes. Pick the right one.
 
 ## 1. Root: `product.md`
 
-The mini PRD. **Stay high-level.** No feature-level detail.
+The mini PRD. **Stay high-level** — no feature-level detail (canonical: [SKILL.md](../SKILL.md) § Strict Rules).
 
 Sections:
 - **Story** — the problem in one paragraph
@@ -21,7 +21,7 @@ Sections:
 - **Features index** — table linking to `features/<name>/product.md`
 - **Open questions** — project-level decisions still open
 
-If you're describing how one feature works, you're in the wrong file. Move to `features/<name>/product.md`.
+Feature-level UX belongs in `features/<name>/product.md`.
 
 ---
 
@@ -30,12 +30,15 @@ If you're describing how one feature works, you're in the wrong file. Move to `f
 Where feature-level UX and requirements live. **Short-lived** — created during DESIGN, archived after the feature ships.
 
 Sections:
+- **Scope** — Owns / Does not own table; explicit boundaries vs neighbour features
 - **Why this feature exists** — the problem this feature solves, in one paragraph
 - **Requirements** — numbered, testable
 - **User experience** — what the user sees and does, with concrete examples
 - **Outputs** — what the feature produces
 - **Non-goals** — feature-scoped non-goals
 - **Open questions** — feature-scoped questions
+
+Link to feature `plan.md` in the header when present. Planning conventions: [plan.md](plan.md) (writing guide in this folder).
 
 Frontmatter:
 ```yaml
@@ -71,6 +74,17 @@ updated: YYYY-MM-DD
 ```
 
 The `design` scope is the only place product and tech content may legitimately mix (design tokens are both brand identity and hex values).
+
+---
+
+## Anti-slop
+
+Artifacts are durable memory — not session transcripts.
+
+- **Repo-relative paths only** — `.spec/features/foo/product.md`, not absolute or machine-specific paths.
+- **No process exhaust** — omit interview notes, brainstorming dumps, and "we considered X" unless the decision matters.
+- **No qualifiers or hedges** — state decisions; delete "maybe", "probably", "might want to".
+- **Omit empty sections** — if a section has no content yet, leave it out; add when there is something to say.
 
 ---
 
@@ -125,7 +139,7 @@ This bridges WHAT to HOW so the reader can navigate.
 - **Create a feature** when scoping a new buildable unit of work
 - **Create a branch doc** only when a genuinely cross-cutting concern emerges
 - **Never** create a branch doc that's really about one feature — that's a feature
-- **Never** put feature-level detail in `product.md` — keep it high-level
+- **Never** put feature-level detail in root `product.md` — canonical rule in [SKILL.md](../SKILL.md) § Strict Rules
 
 ---
 
