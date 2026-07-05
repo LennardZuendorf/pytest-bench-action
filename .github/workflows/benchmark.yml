@@ -1,0 +1,47 @@
+name: Benchmark (self-test)
+
+# Dogfoods pytest-bench-action against its own sample suite in bench/.
+# Proves action.yml runs end-to-end. Note: GitHub-hosted runners get a fresh
+# hostname per job, so cross-run baseline comparison here is best-effort — the
+# value is exercising the full step wiring, not stable numbers.
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  benchmark:
+    name: Run benchmarks via the action
+    runs-on: ubuntu-latest
+    steps:
+      # A local action (uses: ./) requires the repo to be checked out first so
+      # action.yml is present; the action then performs its own checkout.
+      - uses: actions/checkout@v4
+
+      - name: Benchmark and compare
+        id: bench
+        uses: ./
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          python-version: "3.14"
+          setup-command: python -m pip install --upgrade pip pytest pytest-benchmark
+          benchmark-run-command: >
+            pytest bench/
+            --benchmark-only
+            --benchmark-json=benchmark-results.json
+            -q
+          cross-branch-tolerance: 50
+          update-tolerance: 10
+          threshold-map: '{"sum_range": 0.5, "sort_list": 0.5, "str_join": 0.5}'
+
+      - name: Show action outputs
+        if: always()
+        run: |
+          echo "regression-detected: ${{ steps.bench.outputs.regression-detected }}"
+          echo "baseline-updated:    ${{ steps.bench.outputs.baseline-updated }}"
+          echo "node:                ${{ steps.bench.outputs.node }}"

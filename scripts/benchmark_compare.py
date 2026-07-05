@@ -16,13 +16,13 @@ def format_time(seconds: float) -> str:
 def compare_json(baseline_file: str, current_file: str, tolerance: float) -> bool:
     """Compare two benchmark JSON files. Returns True if all passed."""
     try:
-        baseline_data = json.loads(open(baseline_file).read())
+        baseline_data = json.loads(open(baseline_file, encoding="utf-8").read())
     except Exception as e:
         print(f"ERROR: cannot load baseline file '{baseline_file}': {e}", file=sys.stderr)
         sys.exit(1)
 
     try:
-        current_data = json.loads(open(current_file).read())
+        current_data = json.loads(open(current_file, encoding="utf-8").read())
     except Exception as e:
         print(f"ERROR: cannot load current results file '{current_file}': {e}", file=sys.stderr)
         sys.exit(1)

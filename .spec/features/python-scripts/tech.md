@@ -51,10 +51,20 @@ Entry point: `python scripts/benchmark_baseline.py <command> [args]`
 ### Branch Sanitization
 
 ```python
-sanitized = re.sub(r'[/\\ .]', '_', branch)
+def sanitize_branch(branch: str) -> str:
+    for ch in "/\\ .":
+        branch = branch.replace(ch, "_")
+    return branch
 ```
 
 Examples: `feature/my-thing` → `feature_my-thing`, `main` → `main`
+
+### Graceful fallbacks (save / list)
+
+- Missing `machine_info.node` on save → recorded as `"unknown"`
+- `list` with no baselines dir → prints "No baselines directory found."; empty dir → "No baselines found."
+- `list` with malformed JSON → prints `ERROR: …` per file, continues
+- `list` with missing `baseline_info` → branch falls back to filename stem, node/created to `"unknown"`
 
 ---
 
@@ -62,10 +72,12 @@ Examples: `feature/my-thing` → `feature_my-thing`, `main` → `main`
 
 Entry point: `python scripts/benchmark_compare.py compare-json <baseline> <current> [--tolerance=N]`
 
+`--tolerance` defaults to `20` when omitted.
+
 ### Algorithm
 
-1. Load both JSON files; exit 1 with message on parse error
-2. **Node check:** compare `machine_info.node` in baseline vs current. Mismatch → exit 1 with "NODE MISMATCH" message
+1. Load both JSON files; exit 1 with message on parse error or missing file
+2. **Node check:** compare `machine_info.node` in baseline vs current. Mismatch → exit 1 with an error explaining that cross-machine comparison is invalid (names both nodes). **Only enforced when both files carry a node** — if either side lacks `machine_info.node`, comparison proceeds.
 3. Build `name → mean` maps from both files
 4. For each benchmark:
    - In current but not baseline → **NEW** (⚪, pass)
@@ -94,11 +106,12 @@ Entry point: `python scripts/benchmark_compare.py compare-json <baseline> <curre
 ### Output Format (stdout)
 
 ```
-Benchmark              Baseline    Current     Change    Status
-─────────────────────────────────────────────────────────────
-test_foo               1.23ms      1.30ms      +5.7%     ✅ PASS
-test_bar               0.45ms      0.60ms      +33.3%    ❌ FAIL
-test_baz               —           0.10ms      —         ⚪ NEW
-
-Summary: 2 passed, 1 failed | tolerance: 20%
+Benchmark                                   Baseline      Current       Change       Status
+--------------------------------------------------------------------------------------------
+test_foo                                    1.23ms        1.30ms        +5.7%        ✅ PASS
+test_bar                                    0.45ms        0.60ms        +33.3%       ❌ FAIL
+test_baz                                    N/A           0.10ms        N/A          ⚪ NEW
+test_gone                                   0.80ms        MISSING       N/A          ❌ MISSING
 ```
+
+Column widths are dynamic (first column min 42 chars). Absent values render as `N/A` / `MISSING`. The summary is a single line: either `All benchmarks within N% tolerance.` or `One or more benchmarks exceeded N% tolerance or are MISSING.`

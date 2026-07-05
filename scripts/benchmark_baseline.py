@@ -20,7 +20,7 @@ def save(branch: str, results_file: str, baselines_dir: str = ".benchmarks/basel
         print(f"ERROR: results file not found: {results_file}", file=sys.stderr)
         sys.exit(1)
 
-    data = json.loads(results_path.read_text())
+    data = json.loads(results_path.read_text(encoding="utf-8"))
     node = data.get("machine_info", {}).get("node", "unknown")
 
     # Strip raw timing data to reduce file size ~99%
@@ -38,7 +38,7 @@ def save(branch: str, results_file: str, baselines_dir: str = ".benchmarks/basel
     baselines_path.mkdir(parents=True, exist_ok=True)
 
     out_file = baselines_path / f"{sanitize_branch(branch)}.json"
-    out_file.write_text(json.dumps(data, indent=2))
+    out_file.write_text(json.dumps(data, indent=2), encoding="utf-8")
     print(f"Saved baseline: {out_file} (node={node})")
 
 
@@ -47,7 +47,7 @@ def load(branch: str, baselines_dir: str = ".benchmarks/baselines") -> dict:
     if not path.exists():
         print(f"ERROR: no baseline for branch '{branch}'", file=sys.stderr)
         sys.exit(1)
-    return json.loads(path.read_text())
+    return json.loads(path.read_text(encoding="utf-8"))
 
 
 def list_baselines(baselines_dir: str = ".benchmarks/baselines") -> None:
@@ -63,7 +63,7 @@ def list_baselines(baselines_dir: str = ".benchmarks/baselines") -> None:
     print("-" * 90)
     for f in files:
         try:
-            data = json.loads(f.read_text())
+            data = json.loads(f.read_text(encoding="utf-8"))
             info = data.get("baseline_info", {})
             print(f"{info.get('branch', f.stem):<40} {info.get('node', 'unknown'):<30} {info.get('created_at', 'unknown')}")
         except Exception as e:

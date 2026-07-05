@@ -1,0 +1,91 @@
+name: Release
+
+# Automates the mechanical release steps (M2): create the version tag, move the
+# floating major tag (@v1 convention), and draft a GitHub Release with notes
+# from CHANGELOG.md. Run manually from main once the release PR has merged.
+# Publishing the draft and ticking the Marketplace checkbox stay manual.
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Semver tag to release (e.g. v1.0.0)"
+        required: true
+        default: "v1.0.0"
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    env:
+      # Never template-expand the input directly into run: scripts — env
+      # indirection prevents shell injection via a crafted version string.
+      VERSION: ${{ github.event.inputs.version }}
+    steps:
+      - name: Refuse to release from a non-main ref
+        if: github.ref != 'refs/heads/main'
+        run: |
+          echo "::error::Releases must be cut from main (got ${{ github.ref }})."
+          exit 1
+
+      - name: Validate version format
+        run: |
+          echo "${VERSION}" | grep -Eq '^v[0-9]+\.[0-9]+\.[0-9]+$' \
+            || { echo "::error::version must look like v1.2.3 (got '${VERSION}')"; exit 1; }
+
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.14"
+
+      - name: Install test dependencies
+        run: python -m pip install --upgrade pip pytest pytest-benchmark
+
+      - name: Run unit tests (release gate)
+        run: python -m pytest tests/ -q
+
+      - name: Run end-to-end self-test (release gate)
+        run: sh scripts/selftest.sh
+
+      - name: Create and push tags
+        run: |
+          MAJOR="${VERSION%%.*}"
+
+          if git rev-parse -q --verify "refs/tags/${VERSION}" >/dev/null; then
+            echo "::error::tag ${VERSION} already exists — bump the version."
+            exit 1
+          fi
+
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git tag -a "${VERSION}" -m "Release ${VERSION}"
+          git tag -f "${MAJOR}" "${VERSION}"
+          git push origin "${VERSION}"
+          git push origin "${MAJOR}" --force
+          echo "Tagged ${VERSION}; floating ${MAJOR} now points at it."
+
+      - name: Extract release notes from CHANGELOG.md
+        run: |
+          # First "## " section = latest release notes; drop the heading line
+          # itself so the release body doesn't duplicate the release title.
+          awk '/^## /{n++} n==1 && !/^## /' CHANGELOG.md > /tmp/notes.md
+          [ -s /tmp/notes.md ] || { echo "::error::could not extract notes from CHANGELOG.md"; exit 1; }
+          cat /tmp/notes.md
+
+      - name: Draft GitHub Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "${VERSION}" \
+            --draft \
+            --verify-tag \
+            --title "${VERSION}" \
+            --notes-file /tmp/notes.md
+          echo "Draft release created. Manual steps left: publish it and tick"
+          echo "'Publish this Action to the GitHub Marketplace' (category: CI / Testing)."

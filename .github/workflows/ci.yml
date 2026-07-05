@@ -1,0 +1,26 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  unit-tests:
+    name: Unit tests + self-test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.14"
+
+      - name: Install test dependencies
+        run: python -m pip install --upgrade pip pytest pytest-benchmark
+
+      - name: Run unit tests
+        run: python -m pytest tests/ -v
+
+      - name: Run end-to-end self-test
+        run: sh scripts/selftest.sh
