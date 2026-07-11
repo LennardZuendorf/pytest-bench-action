@@ -47,6 +47,27 @@ inputs:
       e.g. {"e2e_create": 30.0, "help": 0.5}. Empty string defaults all tests to 1.0s.
     required: false
     default: ""
+  enforce-same-node:
+    description: >
+      How to treat a hardware mismatch between a baseline and the current run.
+      Comparability is judged on the CPU/system fingerprint (cpu.brand_raw +
+      arch + core count + system), NOT the hostname — so the same machine
+      compares cleanly even when its runner node name changes between jobs. On a
+      genuine hardware mismatch: "true" hard-fails the job (correct for
+      stable/self-hosted runners); "false" (default) skips that comparison with
+      a ::warning:: log line and the comparison-skipped output instead of
+      failing. Either way the action never emits a cross-machine comparison.
+    required: false
+    default: "false"
+  override-label:
+    description: >
+      Pull-request label that waives benchmark regressions for that one PR. When
+      the triggering PR carries this label, a detected regression is still shown
+      in the PR comment but does NOT fail the job (regression-overridden=true).
+      Scoped per-PR and self-clearing — remove the label to re-enforce. Only
+      applies on pull_request events.
+    required: false
+    default: benchmark-override
 
 outputs:
   regression-detected:
@@ -58,6 +79,12 @@ outputs:
   node:
     description: Hostname extracted from machine_info.node in the results JSON
     value: ${{ steps.extract-node.outputs.node }}
+  comparison-skipped:
+    description: '"true" if a baseline comparison was skipped because it ran on a different runner node (enforce-same-node: false)'
+    value: ${{ steps.set-outputs.outputs.comparison-skipped }}
+  regression-overridden:
+    description: '"true" if a regression was detected but waived by the override label on the PR'
+    value: ${{ steps.set-outputs.outputs.regression-overridden }}
 
 runs:
   using: composite
@@ -186,10 +213,17 @@ runs:
           --tolerance="${{ inputs.cross-branch-tolerance }}" \
           > "${{ inputs.baselines-dir }}/main_comparison.txt" 2>&1 || EXIT_CODE=$?
         cat "${{ inputs.baselines-dir }}/main_comparison.txt"
-        if [ $EXIT_CODE -ne 0 ]; then
+        # Exit 3 = hardware mismatch (cannot compare), distinct from a real regression.
+        if [ "$EXIT_CODE" -eq 3 ] && [ "${{ inputs.enforce-same-node }}" != "true" ]; then
+          echo "::warning::Cross-branch comparison vs '${{ github.base_ref }}' skipped: this run ran on different hardware (CPU model) than the baseline. Set enforce-same-node: true to fail on a hardware mismatch instead."
+          echo "main_regression=false" >> "$GITHUB_OUTPUT"
+          echo "main_comparison_skipped=true" >> "$GITHUB_OUTPUT"
+        elif [ "$EXIT_CODE" -ne 0 ]; then
           echo "main_regression=true" >> "$GITHUB_OUTPUT"
+          echo "main_comparison_skipped=false" >> "$GITHUB_OUTPUT"
         else
           echo "main_regression=false" >> "$GITHUB_OUTPUT"
+          echo "main_comparison_skipped=false" >> "$GITHUB_OUTPUT"
         fi
 
     - name: Compare vs previous-commit baseline
@@ -205,10 +239,17 @@ runs:
           --tolerance="${{ inputs.cross-branch-tolerance }}" \
           > "${{ inputs.baselines-dir }}/current_comparison.txt" 2>&1 || EXIT_CODE=$?
         cat "${{ inputs.baselines-dir }}/current_comparison.txt"
-        if [ $EXIT_CODE -ne 0 ]; then
+        # Exit 3 = hardware mismatch (cannot compare), distinct from a real regression.
+        if [ "$EXIT_CODE" -eq 3 ] && [ "${{ inputs.enforce-same-node }}" != "true" ]; then
+          echo "::warning::Previous-commit comparison skipped: this run ran on different hardware (CPU model) than the baseline. Set enforce-same-node: true to fail on a hardware mismatch instead."
+          echo "prev_regression=false" >> "$GITHUB_OUTPUT"
+          echo "prev_comparison_skipped=true" >> "$GITHUB_OUTPUT"
+        elif [ "$EXIT_CODE" -ne 0 ]; then
           echo "prev_regression=true" >> "$GITHUB_OUTPUT"
+          echo "prev_comparison_skipped=false" >> "$GITHUB_OUTPUT"
         else
           echo "prev_regression=false" >> "$GITHUB_OUTPUT"
+          echo "prev_comparison_skipped=false" >> "$GITHUB_OUTPUT"
         fi
 
     - name: Check whether baseline needs updating
@@ -262,10 +303,30 @@ runs:
       run: |
         MAIN_REG="${{ steps.compare-main.outputs.main_regression }}"
         PREV_REG="${{ steps.compare-prev.outputs.prev_regression }}"
+        REGRESSION=false
         if [ "${MAIN_REG}" = "true" ] || [ "${PREV_REG}" = "true" ]; then
-          echo "regression-detected=true" >> "$GITHUB_OUTPUT"
+          REGRESSION=true
+        fi
+        echo "regression-detected=${REGRESSION}" >> "$GITHUB_OUTPUT"
+
+        # A skipped comparison (node mismatch, enforce-same-node: false) is not a
+        # regression — surface it separately so it stays visible in logs/outputs.
+        MAIN_SKIP="${{ steps.compare-main.outputs.main_comparison_skipped }}"
+        PREV_SKIP="${{ steps.compare-prev.outputs.prev_comparison_skipped }}"
+        if [ "${MAIN_SKIP}" = "true" ] || [ "${PREV_SKIP}" = "true" ]; then
+          echo "comparison-skipped=true" >> "$GITHUB_OUTPUT"
         else
-          echo "regression-detected=false" >> "$GITHUB_OUTPUT"
+          echo "comparison-skipped=false" >> "$GITHUB_OUTPUT"
+        fi
+
+        # Per-PR override: a regression is waived (but still reported) when the
+        # triggering PR carries the override label. Never active off a PR.
+        OVERRIDE_ACTIVE="${{ github.event_name == 'pull_request' && contains(github.event.pull_request.labels.*.name, inputs.override-label) }}"
+        if [ "${REGRESSION}" = "true" ] && [ "${OVERRIDE_ACTIVE}" = "true" ]; then
+          echo "regression-overridden=true" >> "$GITHUB_OUTPUT"
+          echo "::warning::Benchmark regression detected but waived by the '${{ inputs.override-label }}' label on this PR — the job will not fail."
+        else
+          echo "regression-overridden=false" >> "$GITHUB_OUTPUT"
         fi
 
         UPDATE="${{ steps.check-update.outputs.should_update }}"
@@ -292,6 +353,10 @@ runs:
         SHOULD_UPDATE: ${{ steps.check-update.outputs.should_update }}
         UPDATE_TOLERANCE: ${{ inputs.update-tolerance }}
         REGRESSION_DETECTED: ${{ steps.set-outputs.outputs.regression-detected }}
+        REGRESSION_OVERRIDDEN: ${{ steps.set-outputs.outputs.regression-overridden }}
+        OVERRIDE_LABEL: ${{ inputs.override-label }}
+        MAIN_COMPARISON_SKIPPED: ${{ steps.compare-main.outputs.main_comparison_skipped }}
+        PREV_COMPARISON_SKIPPED: ${{ steps.compare-prev.outputs.prev_comparison_skipped }}
       with:
         github-token: ${{ inputs.github-token }}
         script: |
@@ -337,21 +402,37 @@ runs:
           }
 
           const baseRef = process.env.BASE_REF || 'base branch';
-          const mainSection = process.env.MAIN_BASELINE_EXISTS === 'true'
-            ? `#### vs Base Branch \`${baseRef}\` (${process.env.CROSS_BRANCH_TOLERANCE}% tolerance)\n\`\`\`\n${mainComparison}\`\`\``
-            : `#### vs Base Branch \`${baseRef}\`\n_No baseline found for \`${baseRef}\` — first run or baseline not yet committed._`;
+          const mainSkipped = process.env.MAIN_COMPARISON_SKIPPED === 'true';
+          const prevSkipped = process.env.PREV_COMPARISON_SKIPPED === 'true';
+          const skipNote = '⏭️ _Comparison skipped — this run ran on different hardware (CPU model) than the baseline (`enforce-same-node: false`). Comparability is judged on the CPU fingerprint, not the hostname. Use a stable/self-hosted runner, or set `enforce-same-node: true` to fail on a hardware mismatch._';
 
-          const prevSection = process.env.PREV_BASELINE_EXISTS === 'true'
-            ? `#### vs Current Branch Baseline (${process.env.CROSS_BRANCH_TOLERANCE}% tolerance)\n\`\`\`\n${prevComparison}\`\`\``
-            : `#### vs Current Branch Baseline\n_No previous baseline found for this branch._`;
+          let mainSection;
+          if (process.env.MAIN_BASELINE_EXISTS !== 'true') {
+            mainSection = `#### vs Base Branch \`${baseRef}\`\n_No baseline found for \`${baseRef}\` — first run or baseline not yet committed._`;
+          } else if (mainSkipped) {
+            mainSection = `#### vs Base Branch \`${baseRef}\`\n${skipNote}`;
+          } else {
+            mainSection = `#### vs Base Branch \`${baseRef}\` (${process.env.CROSS_BRANCH_TOLERANCE}% tolerance)\n\`\`\`\n${mainComparison}\`\`\``;
+          }
+
+          let prevSection;
+          if (process.env.PREV_BASELINE_EXISTS !== 'true') {
+            prevSection = `#### vs Current Branch Baseline\n_No previous baseline found for this branch._`;
+          } else if (prevSkipped) {
+            prevSection = `#### vs Current Branch Baseline\n${skipNote}`;
+          } else {
+            prevSection = `#### vs Current Branch Baseline (${process.env.CROSS_BRANCH_TOLERANCE}% tolerance)\n\`\`\`\n${prevComparison}\`\`\``;
+          }
 
           const updateNote = process.env.SHOULD_UPDATE === 'true'
             ? `💾 **Baseline Update:** Will be updated on merge`
             : `⏭️ **Baseline Update:** Skipped (within ${process.env.UPDATE_TOLERANCE}% threshold)`;
 
-          const regressionNote = process.env.REGRESSION_DETECTED === 'true'
-            ? `\n> ⚠️ **Regression detected** — one or more benchmarks exceeded tolerance.\n`
-            : '';
+          const regressionNote = process.env.REGRESSION_DETECTED !== 'true'
+            ? ''
+            : process.env.REGRESSION_OVERRIDDEN === 'true'
+              ? `\n> ⚠️ **Regression detected — overridden** by the \`${process.env.OVERRIDE_LABEL}\` label. The job will **not** fail. Remove the label to re-enforce.\n`
+              : `\n> ⚠️ **Regression detected** — one or more benchmarks exceeded tolerance.\n`;
 
           const body = [
             '## 📊 Performance Benchmark Results',
@@ -408,7 +489,9 @@ runs:
         retention-days: 30
 
     - name: Fail on regression
-      if: steps.set-outputs.outputs.regression-detected == 'true'
+      if: >-
+        steps.set-outputs.outputs.regression-detected == 'true' &&
+        steps.set-outputs.outputs.regression-overridden != 'true'
       shell: bash
       run: |
         echo "::error::Performance regression detected — one or more benchmarks exceeded tolerance. See the comparison output above."

@@ -13,10 +13,11 @@ First public release.
 - Per-branch baselines committed to the repo (`baselines-dir`, default `.benchmarks/baselines`), stripped of raw `data` arrays (~99% smaller) and stamped with `baseline_info` (branch, node, created_at)
 - Dual baseline comparison: cross-branch (PR vs target branch baseline, `cross-branch-tolerance`, default 20%) and sequential (vs `HEAD~1` baseline)
 - Baseline auto-update on push events when drift exceeds `update-tolerance` (default 5%), committed with `[skip ci]` to prevent CI loops
-- Machine node lock: comparisons across different runner hostnames fail hard instead of producing misleading numbers
-- Deduplicated PR comment with benchmark table, per-test threshold evaluation (`threshold-map`), and both baseline comparisons
-- Final fail-on-regression step: the job fails *after* the PR comment and artifact are published
-- Outputs: `regression-detected`, `baseline-updated`, `node`
+- Hardware-aware comparison gate: comparability is judged on a CPU/system fingerprint (`machine_info.cpu.brand_raw` + arch + core count + `system`), **not** the hostname — so the same machine compares cleanly even when the runner's `node` name changes between jobs (as it does on GitHub-hosted runners), while genuinely different hardware is still rejected. Falls back to `node` for minimal/legacy payloads with no `cpu` block. `enforce-same-node` (default `"false"`) controls the response to a hardware mismatch — skip that comparison with a `::warning::` + `comparison-skipped` output, or hard-fail (`"true"`, for stable/self-hosted runners). `benchmark_compare.py` signals a mismatch with a dedicated exit code (`3`) so the action can tell "cannot compare" from "regressed"
+- Per-PR regression override via the `benchmark-override` label (configurable with `override-label`): a labelled PR still shows the regression in its comment but the job does not fail — an opt-in, self-clearing, per-PR escape hatch instead of loosening tolerances repo-wide
+- Deduplicated PR comment with benchmark table, per-test threshold evaluation (`threshold-map`), and both baseline comparisons; comparison sections render a skip note on node mismatch and the regression banner reflects an active override
+- Final fail-on-regression step: the job fails *after* the PR comment and artifact are published, and is bypassed when the regression is overridden by the label
+- Outputs: `regression-detected`, `baseline-updated`, `node`, `comparison-skipped`, `regression-overridden`
 - Benchmark results uploaded as workflow artifact (30-day retention)
 - Marketplace `branding` (icon `activity`, colour `purple`)
 - Test suite for both helper scripts (`python -m pytest tests/`)
@@ -50,4 +51,4 @@ First public release.
 - One `benchmark-results-file` per run; no multi-file support
 - No historical trending — baselines hold the most recent run only
 - Fork PRs skip the baseline commit (no write access by design); the PR comment still posts
-- Baselines are tied to runner hostname; GitHub-hosted runners get fresh hostnames per job, so a stable (self-hosted) runner is recommended for cross-run comparison
+- Comparisons are gated on a CPU fingerprint, not the hostname, so hosted runners compare on the same CPU model — but GitHub rotates its pool across CPU generations, so some runs still skip, and shared-VM noise is not removed by fingerprinting (absorbed by `cross-branch-tolerance`). A stable/self-hosted runner with `enforce-same-node: "true"` remains recommended for the most reliable cross-run comparison

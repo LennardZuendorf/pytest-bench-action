@@ -2,7 +2,7 @@
 type: entrypoint
 scope: technical
 children: []
-updated: 2026-06-10
+updated: 2026-07-11
 ---
 
 # pytest-bench-action — Technical Architecture
@@ -72,28 +72,36 @@ pytest-bench-action/
 
 ## Key Patterns
 
-- **Baseline storage:** `<baselines-dir>/<sanitized_branch>.json` committed to the repo. Branch names sanitized: `/\\ .` → `_`. -> [features/python-scripts/tech.md](features/python-scripts/tech.md)
-- **Dual baseline comparison:** Cross-branch (PR vs main baseline) + sequential (current vs HEAD~1 baseline). Each is independently optional. -> [features/composite-action/tech.md](features/composite-action/tech.md)
-- **Node lock:** `machine_info.node` extracted from benchmark JSON. Mismatched node → `exit 1`. Ensures apples-to-apples comparison. -> [features/python-scripts/tech.md](features/python-scripts/tech.md)
-- **PR comment deduplication:** `actions/github-script` deletes any prior comment containing `## 📊 Performance Benchmark Results` before posting. -> [features/composite-action/tech.md](features/composite-action/tech.md)
-- **Baseline auto-commit:** Only on `push` events AND when `should_update == 'true'`. Message always ends with `[skip ci]`. -> [features/composite-action/tech.md](features/composite-action/tech.md)
-- **Threshold map:** JSON string input mapping test-name substrings to max-seconds. First match wins. Default 1.0s fallback. Evaluated in PR comment step only. -> [features/composite-action/tech.md](features/composite-action/tech.md)
+- **Baseline storage:** `<baselines-dir>/<sanitized_branch>.json` committed to the repo. Branch names sanitized: `/\\ .` → `_`.
+- **Dual baseline comparison:** Cross-branch (PR vs base-branch baseline) + sequential (current vs HEAD~1 baseline). Each is independently optional. Both gate at `cross-branch-tolerance`.
+- **Hardware fingerprint gate, configurable enforcement:** comparability is keyed on `machine_key()` — a fingerprint of `cpu.brand_raw` + `cpu.arch` + `cpu.count` + `system`, **not** the hostname (`node` is randomized per hosted job; it's a fallback only when no `cpu` block exists). Same hardware compares even when the node name changes; genuinely different hardware is rejected. The action **never** emits a cross-machine comparison. `benchmark_compare.py` signals a mismatch with a dedicated exit code (`3` = `NODE_MISMATCH_EXIT`), distinct from a real regression (`1`). `enforce-same-node` (default `"false"`) decides whether the action **hard-fails** on that code or **skips** the comparison with a `::warning::` and `comparison-skipped=true`.
+- **Per-PR regression override:** `override-label` (default `benchmark-override`) waives a regression for one PR. `contains(github.event.pull_request.labels.*.name, inputs.override-label)` gates the final fail step; the regression is still reported (`regression-overridden=true`, PR-comment banner) — only the `exit 1` is suppressed. Opt-in per-PR, self-clearing, `pull_request`-only.
+- **PR comment deduplication:** `actions/github-script` deletes any prior comment containing `## 📊 Performance Benchmark Results` before posting — exactly one comment per run.
+- **Baseline auto-commit:** Only on `push` events AND when `should_update == 'true'`. Message always ends with `[skip ci]`.
+- **Threshold map:** JSON string input mapping test-name substrings to max-seconds. First match wins. Default 1.0s fallback. Evaluated in PR comment step only.
 
 ## Risks & Mitigations
 
 | Risk | Mitigation |
 |------|------------|
 | Infinite CI loop from baseline commit | `[skip ci]` in every baseline commit message (enforced by AGENTS.md) |
-| Cross-machine noise invalidating baselines | Hard node check in `benchmark_compare.py` — mismatch exits 1 |
+| Cross-machine noise invalidating baselines | Hardware-fingerprint check in `benchmark_compare.py` (CPU model/arch/cores, not hostname) — mismatch exits `3`; `enforce-same-node` chooses fail vs skip-with-warning; a cross-machine comparison is never emitted |
+| A single intentional regression forced repo-wide tolerance loosening | Per-PR `override-label` waives one PR's regression (still reported, non-blocking) instead of weakening detection for everyone |
 | PR from fork can't commit baseline | Conditional: only commit on `push`, skip on `pull_request` |
 | Large baseline files bloating repo | Strip raw `data` arrays on save (~99% size reduction) |
 | Python 3.14 not available on runner | `python-version` is configurable; users can pin to 3.11/3.12/3.13 |
 | Missing benchmark causes silent skip | MISSING benchmarks fail the comparison step explicitly |
 
-## Feature Specs
+## Implementation Map
 
-| Feature | Covers |
-|---------|--------|
-| **[features/composite-action/](features/composite-action/tech.md)** | action.yml step-by-step logic, conditional wiring, input/output contracts |
-| **[features/python-scripts/](features/python-scripts/tech.md)** | Script internals: baseline format, comparison algorithm, exit codes, test fixtures |
-| **[features/self-test-ci/](features/self-test-ci/tech.md)** | Dogfood harness, sample benchmark suite, real-output fixtures, CI workflows |
+The three feature folders (`composite-action`, `python-scripts`, `self-test-ci`)
+were collapsed into this root spec once shipped — **code is the source of
+truth**. Where each concern lives:
+
+| Area | Where |
+|------|-------|
+| Action orchestration, step wiring, input/output contract, PR comment rendering | `action.yml` |
+| Baseline save/load/list, JSON format, branch sanitization | `scripts/benchmark_baseline.py` |
+| Comparison algorithm, node check, exit-code contract | `scripts/benchmark_compare.py` |
+| End-to-end dogfood harness | `scripts/selftest.sh`, `bench/`, `.github/workflows/{ci,benchmark}.yml` |
+| Unit + real-output + action-wiring tests | `tests/` |

@@ -14,6 +14,7 @@ import json
 import pytest
 
 from benchmark_baseline import sanitize_branch  # noqa: F401  (import sanity)
+from benchmark_compare import NODE_MISMATCH_EXIT
 
 REAL = "real_results.json"
 
@@ -48,15 +49,23 @@ class TestCompareOnRealOutput:
         assert result.returncode == 1
         assert "❌ FAIL" in result.stdout
 
-    def test_node_is_read_from_real_machine_info(self, run_script, real_path, write_json):
-        d = json.loads(real_path.read_text())
-        node = d["machine_info"]["node"]
-        # Same node compares fine; a different node must hard-fail.
-        other = json.loads(real_path.read_text())
-        other["machine_info"]["node"] = node + "-different"
-        other_path = write_json("real_other_node.json", other)
-        result = run_script("benchmark_compare.py", "compare-json", str(real_path), str(other_path), "--tolerance=5")
-        assert result.returncode == 1
+    def test_hardware_fingerprint_not_hostname(self, run_script, real_path, write_json):
+        # Real pytest-benchmark output carries a full machine_info.cpu block, so
+        # the gate keys on hardware, not the hostname.
+        # (a) Same CPU, different node name (the GitHub-hosted-runner case) still
+        # compares — the ephemeral hostname must NOT block a valid comparison.
+        same_hw = json.loads(real_path.read_text())
+        same_hw["machine_info"]["node"] = same_hw["machine_info"]["node"] + "-different-host"
+        same_hw_path = write_json("real_same_hw.json", same_hw)
+        ok = run_script("benchmark_compare.py", "compare-json", str(real_path), str(same_hw_path), "--tolerance=5")
+        assert ok.returncode == 0, ok.stderr
+
+        # (b) Different CPU model (hostname unchanged) must hard-fail exit 3.
+        other_hw = json.loads(real_path.read_text())
+        other_hw["machine_info"]["cpu"]["brand_raw"] = "Some Other CPU @ 9.99GHz"
+        other_hw_path = write_json("real_other_hw.json", other_hw)
+        result = run_script("benchmark_compare.py", "compare-json", str(real_path), str(other_hw_path), "--tolerance=5")
+        assert result.returncode == NODE_MISMATCH_EXIT
         assert "cross-machine comparison is invalid" in result.stderr
 
 

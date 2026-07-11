@@ -2,7 +2,7 @@
 type: entrypoint
 scope: product
 children: []
-updated: 2026-06-11
+updated: 2026-07-11
 ---
 
 # pytest-bench-action — Product
@@ -47,16 +47,21 @@ Python library or application maintainers running pytest who want continuous per
 
 ---
 
-| Feature | Priority | Details in |
-|---------|----------|------------|
-| **Composite action definition** (`action.yml`) | P0 | [features/composite-action/](features/composite-action/product.md) |
-| **Baseline management** (`benchmark_baseline.py`) | P0 | [features/python-scripts/](features/python-scripts/product.md) |
-| **Comparison engine** (`benchmark_compare.py`) | P0 | [features/python-scripts/](features/python-scripts/product.md) |
-| **PR comment with results table** | P0 | [features/composite-action/](features/composite-action/product.md) |
-| **Per-test threshold map** | P1 | [features/composite-action/](features/composite-action/product.md) |
-| **Integration test suite** | P0 (release gate) | See Release Criteria below |
-| **Self-test / dogfood CI** | P0 (release gate) | [features/self-test-ci/](features/self-test-ci/product.md) |
-| **Example workflow** | P1 | See Release Criteria below |
+Feature-level detail was collapsed into this root spec and the code once shipped
+(see [tech.md](tech.md) Implementation Map). Priorities:
+
+| Feature | Priority | Lives in |
+|---------|----------|----------|
+| **Composite action definition** | P0 | `action.yml` |
+| **Baseline management** | P0 | `scripts/benchmark_baseline.py` |
+| **Comparison engine** | P0 | `scripts/benchmark_compare.py` |
+| **PR comment with results table** | P0 | `action.yml` (github-script step) |
+| **Per-test threshold map** | P1 | `action.yml` (PR comment) |
+| **Configurable node enforcement** (`enforce-same-node`) | P1 | `action.yml` + `scripts/benchmark_compare.py` |
+| **Per-PR regression override** (`override-label`) | P1 | `action.yml` |
+| **Integration test suite** | P0 (release gate) | `tests/` |
+| **Self-test / dogfood CI** | P0 (release gate) | `scripts/selftest.sh`, `.github/workflows/` |
+| **Example workflow** | P1 | `docs/example-workflow.yml` |
 
 ## Implementation Phases
 
@@ -72,10 +77,11 @@ Release-gate sequencing and status live in [plan.md](plan.md).
 ## Product Decisions
 
 1. **Baselines committed to the repo.** Avoids external state and makes baselines auditable via git blame/log. Trade-off: slight repo size growth (mitigated by stripping raw `data` arrays).
-2. **Node check is a hard failure.** Silent cross-machine comparison would be worse than no comparison. Users are expected to pin runner types.
-3. **Single PR comment, deduplicated.** Previous bot comments are deleted before posting to keep PR threads clean. One comment per run, always fresh.
-4. **`[skip ci]` on baseline commits.** Prevents infinite CI loops when the action commits an updated baseline. Non-negotiable.
-5. **`update-tolerance` separate from `cross-branch-tolerance`.** Baseline updates only trigger when performance genuinely shifts (default 5%), not on every noisy run.
+2. **Never compare across machines; gate on hardware, not hostname.** A cross-machine comparison is never emitted — silent wrong numbers would be worse than none. But the original gate keyed on `machine_info.node` (the hostname), which GitHub-hosted runners randomize per job, so it false-skipped/failed every run after the first. Comparability is now keyed on a **CPU/system fingerprint** (`cpu.brand_raw` + arch + core count + `system`), so the same hardware compares even when the node name changes; only genuinely different hardware is rejected (falls back to `node` when no `cpu` block exists). On a hardware mismatch, `enforce-same-node` (default `"false"`) skips with a visible `::warning::` + `comparison-skipped` output; `"true"` hard-fails (stable/self-hosted). The script signals a mismatch with a dedicated exit code (`3`) so "cannot compare" is never conflated with "regressed" (`1`). *(Supersedes the earlier "node check is always a hard failure" decision.)*
+3. **Accepted regressions are waived per-PR, not repo-wide.** `override-label` (default `benchmark-override`) lets a maintainer merge one intentionally-slower PR without loosening tolerances for everyone. The regression is still detected and shown (`regression-overridden`, PR-comment banner) — only the job failure is suppressed. Opt-in, self-clearing (remove the label), `pull_request`-only; never a blanket toggle.
+4. **Single PR comment, deduplicated.** Previous bot comments are deleted before posting to keep PR threads clean. One comment per run, always fresh.
+5. **`[skip ci]` on baseline commits.** Prevents infinite CI loops when the action commits an updated baseline. Non-negotiable.
+6. **`update-tolerance` separate from `cross-branch-tolerance`.** Baseline updates only trigger when performance genuinely shifts (default 5%), not on every noisy run.
 
 ---
 
@@ -90,7 +96,8 @@ A release is ready when ALL of the following are true.
 - [x] Comparison detects regressions and new/missing benchmarks
 - [x] PR comment posts and deduplicates correctly
 - [x] Baseline commits include `[skip ci]`
-- [x] Node mismatch fails with a clear error message
+- [x] Comparability is gated on a CPU/system fingerprint (not the hostname), so hosted runners compare on the same CPU; a genuine hardware mismatch is handled per `enforce-same-node` — skipped with a `::warning::` + `comparison-skipped` output by default, or hard-failed when `"true"` (2026-07-11)
+- [x] Accepted regressions can be waived per-PR via the `override-label` — still reported, non-blocking (2026-07-11)
 - [x] Threshold map evaluated per-test in PR comment
 
 ### Testing
