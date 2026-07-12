@@ -8,9 +8,19 @@ name: Benchmark (self-test)
 # PR-only trigger: baseline updates are staged as a commit on the PR branch
 # and land on main when the PR merges — no push trigger, no direct commit to
 # a (potentially rule-protected) main branch.
+#
+# concurrency: a new push to the PR (yours, or a bot like pre-commit.ci)
+# re-fires this workflow via `synchronize`. Without a concurrency group, an
+# in-flight run and the new run can both try to push a staged baseline commit
+# to the same branch and race — the loser gets a non-fast-forward rejection.
+# Cancelling the stale run avoids that.
 
 on:
   pull_request:
+
+concurrency:
+  group: benchmark-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
 
 permissions:
   contents: write
