@@ -12,7 +12,6 @@ else through untouched.
 import json
 
 import pytest
-
 from benchmark_baseline import sanitize_branch  # noqa: F401  (import sanity)
 from benchmark_compare import NODE_MISMATCH_EXIT
 
@@ -29,14 +28,25 @@ class TestRealOutputShape:
         d = json.loads(real_path.read_text())
         assert {"machine_info", "commit_info", "benchmarks", "datetime", "version"} <= set(d)
         b = d["benchmarks"][0]
-        assert {"group", "name", "fullname", "params", "param", "extra_info", "options", "stats"} <= set(b)
+        assert {
+            "group",
+            "name",
+            "fullname",
+            "params",
+            "param",
+            "extra_info",
+            "options",
+            "stats",
+        } <= set(b)
         # outliers is a "lo;hi" string in real output, not a number
         assert isinstance(b["stats"]["outliers"], str)
 
 
 class TestCompareOnRealOutput:
     def test_real_vs_self_passes(self, run_script, real_path):
-        result = run_script("benchmark_compare.py", "compare-json", str(real_path), str(real_path), "--tolerance=5")
+        result = run_script(
+            "benchmark_compare.py", "compare-json", str(real_path), str(real_path), "--tolerance=5"
+        )
         assert result.returncode == 0, result.stderr
         assert "✅ PASS" in result.stdout
 
@@ -45,7 +55,9 @@ class TestCompareOnRealOutput:
         # Double the mean of the first benchmark — a real 100% regression.
         d["benchmarks"][0]["stats"]["mean"] *= 2
         regressed = write_json("real_regressed.json", d)
-        result = run_script("benchmark_compare.py", "compare-json", str(real_path), str(regressed), "--tolerance=10")
+        result = run_script(
+            "benchmark_compare.py", "compare-json", str(real_path), str(regressed), "--tolerance=10"
+        )
         assert result.returncode == 1
         assert "❌ FAIL" in result.stdout
 
@@ -57,14 +69,26 @@ class TestCompareOnRealOutput:
         same_hw = json.loads(real_path.read_text())
         same_hw["machine_info"]["node"] = same_hw["machine_info"]["node"] + "-different-host"
         same_hw_path = write_json("real_same_hw.json", same_hw)
-        ok = run_script("benchmark_compare.py", "compare-json", str(real_path), str(same_hw_path), "--tolerance=5")
+        ok = run_script(
+            "benchmark_compare.py",
+            "compare-json",
+            str(real_path),
+            str(same_hw_path),
+            "--tolerance=5",
+        )
         assert ok.returncode == 0, ok.stderr
 
         # (b) Different CPU model (hostname unchanged) must hard-fail exit 3.
         other_hw = json.loads(real_path.read_text())
         other_hw["machine_info"]["cpu"]["brand_raw"] = "Some Other CPU @ 9.99GHz"
         other_hw_path = write_json("real_other_hw.json", other_hw)
-        result = run_script("benchmark_compare.py", "compare-json", str(real_path), str(other_hw_path), "--tolerance=5")
+        result = run_script(
+            "benchmark_compare.py",
+            "compare-json",
+            str(real_path),
+            str(other_hw_path),
+            "--tolerance=5",
+        )
         assert result.returncode == NODE_MISMATCH_EXIT
         assert "cross-machine comparison is invalid" in result.stderr
 

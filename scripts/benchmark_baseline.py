@@ -3,7 +3,7 @@
 
 import json
 import sys
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 
 
@@ -31,7 +31,7 @@ def save(branch: str, results_file: str, baselines_dir: str = ".benchmarks/basel
     data["baseline_info"] = {
         "branch": branch,
         "node": node,
-        "created_at": datetime.now(timezone.utc).isoformat(),
+        "created_at": datetime.now(UTC).isoformat(),
     }
 
     baselines_path = Path(baselines_dir)
@@ -65,7 +65,9 @@ def list_baselines(baselines_dir: str = ".benchmarks/baselines") -> None:
         try:
             data = json.loads(f.read_text(encoding="utf-8"))
             info = data.get("baseline_info", {})
-            print(f"{info.get('branch', f.stem):<40} {info.get('node', 'unknown'):<30} {info.get('created_at', 'unknown')}")
+            print(
+                f"{info.get('branch', f.stem):<40} {info.get('node', 'unknown'):<30} {info.get('created_at', 'unknown')}"
+            )
         except Exception as e:
             print(f"{f.stem:<40} ERROR: {e}")
 

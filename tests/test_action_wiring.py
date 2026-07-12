@@ -29,15 +29,11 @@ class TestNewInputs:
 
     def test_enforce_same_node_defaults_to_false(self, action_text):
         # Opt-in safety: must default to hosted-runner-friendly skip, not fail.
-        block = re.search(
-            r"^\s{2}enforce-same-node:\n(?:\s{4}.*\n)+", action_text, re.MULTILINE
-        )
+        block = re.search(r"^\s{2}enforce-same-node:\n(?:\s{4}.*\n)+", action_text, re.MULTILINE)
         assert block and re.search(r'default:\s*"false"', block.group(0))
 
     def test_override_label_declared_with_default(self, action_text):
-        block = re.search(
-            r"^\s{2}override-label:\n(?:\s{4}.*\n)+", action_text, re.MULTILINE
-        )
+        block = re.search(r"^\s{2}override-label:\n(?:\s{4}.*\n)+", action_text, re.MULTILINE)
         assert block and re.search(r"default:\s*benchmark-override", block.group(0))
 
 
@@ -66,9 +62,7 @@ class TestNodeMismatchSkipPath:
 
     def test_skip_is_not_a_regression(self, action_text):
         # In the skip branch, regression must be forced false.
-        skip_branch = re.search(
-            r"-eq 3.*?main_comparison_skipped=true", action_text, re.DOTALL
-        )
+        skip_branch = re.search(r"-eq 3.*?main_comparison_skipped=true", action_text, re.DOTALL)
         assert skip_branch and "main_regression=false" in skip_branch.group(0)
 
 

@@ -1,7 +1,6 @@
 """Tests for scripts/benchmark_compare.py (compare-json command)."""
 
 import pytest
-
 from benchmark_compare import NODE_MISMATCH_EXIT, format_time, machine_key
 from conftest import make_results
 
@@ -23,8 +22,10 @@ def with_cpu(brand: str, node: str, benchmarks: dict) -> dict:
 class TestPassFail:
     def test_within_tolerance_passes(self, run_script, fixtures_dir):
         result = run_script(
-            SCRIPT, "compare-json",
-            str(fixtures_dir / "baseline.json"), str(fixtures_dir / "results.json"),
+            SCRIPT,
+            "compare-json",
+            str(fixtures_dir / "baseline.json"),
+            str(fixtures_dir / "results.json"),
             "--tolerance=20",
         )
         assert result.returncode == 0
@@ -33,8 +34,10 @@ class TestPassFail:
 
     def test_regression_fails(self, run_script, fixtures_dir):
         result = run_script(
-            SCRIPT, "compare-json",
-            str(fixtures_dir / "baseline.json"), str(fixtures_dir / "results_regression.json"),
+            SCRIPT,
+            "compare-json",
+            str(fixtures_dir / "baseline.json"),
+            str(fixtures_dir / "results_regression.json"),
             "--tolerance=20",
         )
         assert result.returncode == 1
@@ -66,8 +69,10 @@ class TestPassFail:
 
     def test_default_tolerance_is_20(self, run_script, fixtures_dir):
         result = run_script(
-            SCRIPT, "compare-json",
-            str(fixtures_dir / "baseline.json"), str(fixtures_dir / "results_regression.json"),
+            SCRIPT,
+            "compare-json",
+            str(fixtures_dir / "baseline.json"),
+            str(fixtures_dir / "results_regression.json"),
         )
         assert result.returncode == 1
         assert "20.0% tolerance" in result.stdout
@@ -76,8 +81,10 @@ class TestPassFail:
 class TestNewAndMissing:
     def test_new_benchmark_passes(self, run_script, fixtures_dir):
         result = run_script(
-            SCRIPT, "compare-json",
-            str(fixtures_dir / "baseline.json"), str(fixtures_dir / "results_new_benchmark.json"),
+            SCRIPT,
+            "compare-json",
+            str(fixtures_dir / "baseline.json"),
+            str(fixtures_dir / "results_new_benchmark.json"),
             "--tolerance=20",
         )
         assert result.returncode == 0
@@ -87,8 +94,10 @@ class TestNewAndMissing:
     def test_missing_benchmark_fails(self, run_script, fixtures_dir, write_json):
         current = write_json("current.json", make_results(benchmarks={"test_foo": 0.001}))
         result = run_script(
-            SCRIPT, "compare-json",
-            str(fixtures_dir / "baseline.json"), str(current),
+            SCRIPT,
+            "compare-json",
+            str(fixtures_dir / "baseline.json"),
+            str(current),
             "--tolerance=20",
         )
         assert result.returncode == 1
@@ -102,11 +111,14 @@ class TestNodeCheck:
         # with the dedicated NODE_MISMATCH_EXIT (3) so the action can skip the
         # comparison (enforce-same-node: false) instead of failing the job.
         current = write_json(
-            "current.json", make_results(node="runner-xyz", benchmarks={"test_foo": 0.001, "test_bar": 0.0005})
+            "current.json",
+            make_results(node="runner-xyz", benchmarks={"test_foo": 0.001, "test_bar": 0.0005}),
         )
         result = run_script(
-            SCRIPT, "compare-json",
-            str(fixtures_dir / "baseline.json"), str(current),
+            SCRIPT,
+            "compare-json",
+            str(fixtures_dir / "baseline.json"),
+            str(current),
             "--tolerance=20",
         )
         assert result.returncode == NODE_MISMATCH_EXIT
@@ -115,20 +127,27 @@ class TestNodeCheck:
         assert "runner-abc" in result.stderr
         assert "runner-xyz" in result.stderr
 
-    def test_node_mismatch_exit_code_differs_from_regression(self, run_script, fixtures_dir, write_json):
+    def test_node_mismatch_exit_code_differs_from_regression(
+        self, run_script, fixtures_dir, write_json
+    ):
         # Guard the whole point of the distinct code: a real regression (same
         # node) exits 1, a node mismatch exits 3 — never conflated.
         regression = run_script(
-            SCRIPT, "compare-json",
-            str(fixtures_dir / "baseline.json"), str(fixtures_dir / "results_regression.json"),
+            SCRIPT,
+            "compare-json",
+            str(fixtures_dir / "baseline.json"),
+            str(fixtures_dir / "results_regression.json"),
             "--tolerance=20",
         )
         mismatch_current = write_json(
-            "mismatch.json", make_results(node="runner-xyz", benchmarks={"test_foo": 0.001, "test_bar": 0.0005})
+            "mismatch.json",
+            make_results(node="runner-xyz", benchmarks={"test_foo": 0.001, "test_bar": 0.0005}),
         )
         mismatch = run_script(
-            SCRIPT, "compare-json",
-            str(fixtures_dir / "baseline.json"), str(mismatch_current),
+            SCRIPT,
+            "compare-json",
+            str(fixtures_dir / "baseline.json"),
+            str(mismatch_current),
             "--tolerance=20",
         )
         assert regression.returncode == 1
@@ -137,11 +156,14 @@ class TestNodeCheck:
 
     def test_missing_node_on_one_side_proceeds(self, run_script, fixtures_dir, write_json):
         current = write_json(
-            "current.json", make_results(node="", benchmarks={"test_foo": 0.001, "test_bar": 0.0005})
+            "current.json",
+            make_results(node="", benchmarks={"test_foo": 0.001, "test_bar": 0.0005}),
         )
         result = run_script(
-            SCRIPT, "compare-json",
-            str(fixtures_dir / "baseline.json"), str(current),
+            SCRIPT,
+            "compare-json",
+            str(fixtures_dir / "baseline.json"),
+            str(current),
             "--tolerance=20",
         )
         assert result.returncode == 0
@@ -196,8 +218,10 @@ class TestErrorHandling:
 
     def test_invalid_tolerance_exits_1(self, run_script, fixtures_dir):
         result = run_script(
-            SCRIPT, "compare-json",
-            str(fixtures_dir / "baseline.json"), str(fixtures_dir / "results.json"),
+            SCRIPT,
+            "compare-json",
+            str(fixtures_dir / "baseline.json"),
+            str(fixtures_dir / "results.json"),
             "--tolerance=lots",
         )
         assert result.returncode == 1

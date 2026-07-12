@@ -60,13 +60,15 @@ def format_time(seconds: float) -> str:
 def compare_json(baseline_file: str, current_file: str, tolerance: float) -> bool:
     """Compare two benchmark JSON files. Returns True if all passed."""
     try:
-        baseline_data = json.loads(open(baseline_file, encoding="utf-8").read())
+        with open(baseline_file, encoding="utf-8") as f:
+            baseline_data = json.load(f)
     except Exception as e:
         print(f"ERROR: cannot load baseline file '{baseline_file}': {e}", file=sys.stderr)
         sys.exit(1)
 
     try:
-        current_data = json.loads(open(current_file, encoding="utf-8").read())
+        with open(current_file, encoding="utf-8") as f:
+            current_data = json.load(f)
     except Exception as e:
         print(f"ERROR: cannot load current results file '{current_file}': {e}", file=sys.stderr)
         sys.exit(1)
@@ -112,11 +114,15 @@ def compare_json(baseline_file: str, current_file: str, tolerance: float) -> boo
     all_passed = True
     for name in all_names:
         if name not in baseline_map:
-            print(f"{name:<{col_w}} {'N/A':<13} {format_time(current_map[name]):<13} {'NEW':<13} ⚪ NEW")
+            print(
+                f"{name:<{col_w}} {'N/A':<13} {format_time(current_map[name]):<13} {'NEW':<13} ⚪ NEW"
+            )
             continue
 
         if name not in current_map:
-            print(f"{name:<{col_w}} {format_time(baseline_map[name]):<13} {'MISSING':<13} {'N/A':<13} ❌ MISSING")
+            print(
+                f"{name:<{col_w}} {format_time(baseline_map[name]):<13} {'MISSING':<13} {'N/A':<13} ❌ MISSING"
+            )
             all_passed = False
             continue
 
@@ -156,7 +162,9 @@ def main() -> None:
 
     if command == "compare-json":
         if len(sys.argv) < 4:
-            print("Usage: benchmark_compare.py compare-json <baseline-file> <current-file> [--tolerance=N]")
+            print(
+                "Usage: benchmark_compare.py compare-json <baseline-file> <current-file> [--tolerance=N]"
+            )
             sys.exit(1)
 
         baseline_file = sys.argv[2]

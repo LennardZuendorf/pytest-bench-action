@@ -1,0 +1,6 @@
+# ty (type checker) configuration for pytest-bench-action.
+# The test suite imports the helper modules from scripts/ (conftest.py adds that
+# directory to sys.path at runtime); tell ty about the same import root so it can
+# resolve `benchmark_compare` / `benchmark_baseline` statically.
+[environment]
+extra-paths = ["scripts"]
