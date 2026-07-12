@@ -140,6 +140,7 @@ runs:
       run: |
         TARGET_BRANCH="${{ github.base_ref }}"
         SANITIZED_TARGET=$(echo "${TARGET_BRANCH}" | tr '/\\. ' '_')
+        echo "sanitized_target_branch=${SANITIZED_TARGET}" >> "$GITHUB_OUTPUT"
         # Dedicated scratch file (not a branch name) so we never clobber a
         # committed baseline, whatever the base branch is called.
         BASELINE_PATH="${{ inputs.baselines-dir }}/_cross_baseline.json"

@@ -23,6 +23,11 @@ def action_text() -> str:
     return ACTION_YML.read_text(encoding="utf-8")
 
 
+class TestSanitizedTargetBranchOutput:
+    def test_sanitized_target_branch_exported(self, action_text):
+        assert "sanitized_target_branch=${SANITIZED_TARGET}" in action_text
+
+
 class TestNewInputs:
     def test_enforce_same_node_declared(self, action_text):
         assert re.search(r"^\s{2}enforce-same-node:$", action_text, re.MULTILINE)
