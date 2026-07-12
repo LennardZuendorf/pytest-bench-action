@@ -298,10 +298,12 @@ runs:
           --baselines-dir="${{ inputs.baselines-dir }}"
 
     - name: Commit staged baseline to PR branch (same-repo PRs only)
+      id: commit-baseline
       if: >-
         github.event_name == 'pull_request' &&
         steps.check-update.outputs.should_update == 'true' &&
         github.event.pull_request.head.repo.full_name == github.repository
+      continue-on-error: true
       uses: EndBug/add-and-commit@v9
       with:
         add: "${{ inputs.baselines-dir }}/${{ steps.load-main-baseline.outputs.sanitized_target_branch }}.json"
@@ -310,6 +312,12 @@ runs:
           chore(benchmark): update baseline for branch "${{ github.base_ref }}"
           (node: ${{ steps.extract-node.outputs.node }}) [skip ci]
         push: true
+
+    - name: Warn on baseline commit push failure
+      if: steps.commit-baseline.outcome == 'failure'
+      shell: bash
+      run: |
+        echo "::warning::Baseline commit could not be pushed (likely a concurrent push to this branch, e.g. from another bot). The compare/regression result above is unaffected — the baseline will be retried on the next run."
 
     - name: Set outputs
       shell: bash

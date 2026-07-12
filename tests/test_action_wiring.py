@@ -195,3 +195,29 @@ class TestSinglePrComment:
         assert "createComment" in action_text
         # delete must come before create in the script.
         assert action_text.index("deleteComment") < action_text.index("createComment")
+
+
+class TestBaselineCommitPushFailureIsNonFatal:
+    def _commit_step_block(self, action_text):
+        block = re.search(
+            r"- name: Commit staged baseline to PR branch \(same-repo PRs only\)\n(?:.*\n)+?\n    - name:",
+            action_text,
+        )
+        assert block, "step block not found"
+        return block.group(0)
+
+    def test_commit_step_has_id_and_continue_on_error(self, action_text):
+        block = self._commit_step_block(action_text)
+        assert "id: commit-baseline" in block
+        assert "continue-on-error: true" in block
+
+    def test_warning_step_exists_and_gated_on_failure(self, action_text):
+        assert "- name: Warn on baseline commit push failure" in action_text
+        block = re.search(
+            r"- name: Warn on baseline commit push failure\n(?:.*\n)+?(?=\n    - name:|\Z)",
+            action_text,
+        )
+        assert block, "warning step block not found"
+        text = block.group(0)
+        assert "if: steps.commit-baseline.outcome == 'failure'" in text
+        assert "::warning::" in text
