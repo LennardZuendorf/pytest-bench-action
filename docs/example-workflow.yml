@@ -5,7 +5,12 @@
 # Notes:
 # - The action performs its own checkout (fetch-depth: 2); you do NOT need
 #   an actions/checkout step before it.
-# - contents:write is needed to commit baselines on push events;
+# - Trigger on pull_request only. Baseline updates are staged as a commit on
+#   the PR branch itself and land on the target branch when the PR merges —
+#   no push trigger needed, and a direct push would fail anyway on a branch
+#   protected to require PR-only changes.
+# - contents:write is needed to push that staged baseline commit onto the PR
+#   branch (same-repo PRs only — forks are skipped automatically);
 #   pull-requests:write is needed to post the PR comment.
 # - Comparability is judged on the CPU fingerprint (machine_info.cpu), not the
 #   runner hostname, so hosted runners compare cleanly on the same CPU model.
@@ -18,8 +23,6 @@
 name: Benchmarks
 
 on:
-  push:
-    branches: [main]
   pull_request:
 
 permissions:
