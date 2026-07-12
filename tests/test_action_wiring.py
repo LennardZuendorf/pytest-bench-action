@@ -106,6 +106,18 @@ class TestBaselineUpdatedOutputGate:
         assert '[ "${{ github.event_name }}" = "push" ] && [ "${UPDATE}" = "true" ]' not in action_text
 
 
+class TestForkAwareBaselineNote:
+    def test_is_fork_env_wired(self, action_text):
+        assert (
+            "IS_FORK: ${{ github.event.pull_request.head.repo.full_name != github.repository }}"
+            in action_text
+        )
+
+    def test_update_note_branches_on_fork(self, action_text):
+        assert "process.env.IS_FORK === 'true'" in action_text
+        assert "can't be committed back" in action_text
+
+
 class TestNewInputs:
     def test_enforce_same_node_declared(self, action_text):
         assert re.search(r"^\s{2}enforce-same-node:$", action_text, re.MULTILINE)

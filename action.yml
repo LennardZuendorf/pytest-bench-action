@@ -372,6 +372,7 @@ runs:
         OVERRIDE_LABEL: ${{ inputs.override-label }}
         MAIN_COMPARISON_SKIPPED: ${{ steps.compare-main.outputs.main_comparison_skipped }}
         PREV_COMPARISON_SKIPPED: ${{ steps.compare-prev.outputs.prev_comparison_skipped }}
+        IS_FORK: ${{ github.event.pull_request.head.repo.full_name != github.repository }}
       with:
         github-token: ${{ inputs.github-token }}
         script: |
@@ -439,9 +440,12 @@ runs:
             prevSection = `#### vs Current Branch Baseline (${process.env.CROSS_BRANCH_TOLERANCE}% tolerance)\n\`\`\`\n${prevComparison}\`\`\``;
           }
 
-          const updateNote = process.env.SHOULD_UPDATE === 'true'
-            ? `💾 **Baseline Update:** Will be updated on merge`
-            : `⏭️ **Baseline Update:** Skipped (within ${process.env.UPDATE_TOLERANCE}% threshold)`;
+          const isFork = process.env.IS_FORK === 'true';
+          const updateNote = process.env.SHOULD_UPDATE !== 'true'
+            ? `⏭️ **Baseline Update:** Skipped (within ${process.env.UPDATE_TOLERANCE}% threshold)`
+            : isFork
+              ? `⚠️ **Baseline Update:** Change detected, but this PR is from a fork — baselines can't be committed back. Update it manually after merging if needed.`
+              : `💾 **Baseline Update:** Staged on this branch — will land on \`${process.env.BASE_REF}\` when this PR merges.`;
 
           const regressionNote = process.env.REGRESSION_DETECTED !== 'true'
             ? ''
