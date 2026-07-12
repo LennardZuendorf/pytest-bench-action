@@ -28,6 +28,15 @@ class TestSanitizedTargetBranchOutput:
         assert "sanitized_target_branch=${SANITIZED_TARGET}" in action_text
 
 
+class TestCheckoutRefForPRs:
+    def test_checkout_uses_conditional_ref(self, action_text):
+        assert (
+            "ref: ${{ github.event_name == 'pull_request' && "
+            "(github.event.pull_request.head.repo.full_name == github.repository && "
+            "github.head_ref || github.event.pull_request.head.sha) || github.ref }}"
+        ) in action_text
+
+
 class TestNewInputs:
     def test_enforce_same_node_declared(self, action_text):
         assert re.search(r"^\s{2}enforce-same-node:$", action_text, re.MULTILINE)

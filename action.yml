@@ -92,6 +92,7 @@ runs:
     - name: Checkout
       uses: actions/checkout@v4
       with:
+        ref: ${{ github.event_name == 'pull_request' && (github.event.pull_request.head.repo.full_name == github.repository && github.head_ref || github.event.pull_request.head.sha) || github.ref }}
         fetch-depth: 2
         token: ${{ inputs.github-token }}
 
