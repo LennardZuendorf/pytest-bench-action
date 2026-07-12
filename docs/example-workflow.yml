@@ -5,7 +5,12 @@
 # Notes:
 # - The action performs its own checkout (fetch-depth: 2); you do NOT need
 #   an actions/checkout step before it.
-# - contents:write is needed to commit baselines on push events;
+# - Trigger on pull_request only. Baseline updates are staged as a commit on
+#   the PR branch itself and land on the target branch when the PR merges —
+#   no push trigger needed, and a direct push would fail anyway on a branch
+#   protected to require PR-only changes.
+# - contents:write is needed to push that staged baseline commit onto the PR
+#   branch (same-repo PRs only — forks are skipped automatically);
 #   pull-requests:write is needed to post the PR comment.
 # - Comparability is judged on the CPU fingerprint (machine_info.cpu), not the
 #   runner hostname, so hosted runners compare cleanly on the same CPU model.
@@ -14,13 +19,19 @@
 # - To merge a PR with an intentional regression, add the "benchmark-override"
 #   label to it (configurable via override-label): the regression is still
 #   reported in the PR comment but does not fail the job.
+# - The concurrency group cancels a stale in-flight run when the PR branch
+#   gets a new push (yours, or a bot's, e.g. pre-commit.ci) — otherwise two
+#   concurrent runs can race to push a staged baseline commit and one loses
+#   with a non-fast-forward rejection.
 
 name: Benchmarks
 
 on:
-  push:
-    branches: [main]
   pull_request:
+
+concurrency:
+  group: benchmark-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
 
 permissions:
   contents: write

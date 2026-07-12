@@ -1,6 +1,10 @@
 # pytest-bench-action
 
+<img src="docs/assets/icon.png" alt="pytest Benchmark Baseline Check icon" width="96" align="right" />
+
 A reusable GitHub Action that runs `pytest-benchmark`, manages per-branch baselines committed to your repository, compares results against those baselines, and posts a formatted summary comment on every PR.
+
+> Not affiliated with, endorsed by, or sponsored by the Python Software Foundation or the pytest / pytest-benchmark maintainers — an independent, third-party tool.
 
 ## Usage
 
@@ -65,16 +69,37 @@ permissions:
   pull-requests: write
 ```
 
+`contents: write` pushes the staged baseline commit onto the PR branch (same-repo PRs only); `pull-requests: write` posts the PR comment.
+
 ## How It Works
 
 1. **Loads baselines** from git history (target branch + previous commit)
 2. **Runs your benchmark command** via `benchmark-run-command`
 3. **Compares results** against both baselines with configurable tolerance
-4. **Commits updated baseline** on push events (with `[skip ci]` to prevent loops)
+4. **Stages an updated baseline commit** on your PR branch when the result exceeds `update-tolerance` (same-repo PRs only, with `[skip ci]` to prevent loops) — it lands on the target branch automatically when the PR merges
 5. **Posts a PR comment** with a formatted table of results and comparisons
 6. **Fails the job** if any benchmark regressed beyond tolerance — after the comment and artifact are published, so you always get the full report
 
 The action checks out your repository itself (`fetch-depth: 2`); you don't need a separate `actions/checkout` step. See [docs/example-workflow.yml](docs/example-workflow.yml) for a complete reference workflow.
+
+## Suggested Usage
+
+Trigger on `pull_request` only. A separate `push` trigger for baseline
+maintenance isn't needed — the baseline update rides along inside the PR
+itself and lands naturally when the PR merges. It also avoids a real failure
+mode: repos with a ruleset requiring PR-only changes on the target branch
+reject any direct push, including this action's own baseline commit.
+
+| Event | What the action does |
+|-------|-----------------------|
+| PR opened / synchronized | Runs your benchmark command on the PR branch tip, compares against the target branch's committed baseline (`cross-branch-tolerance`), posts/updates the PR comment. |
+| Result differs from the target baseline by more than `update-tolerance` | Stages a baseline-update commit **on the PR branch itself** (`[skip ci]`) — same-repo PRs only, skipped for forks. |
+| PR merged | The staged commit is already part of the PR, so it lands on the target branch as part of the normal merge. No separate rerun, no direct push to the target branch. |
+
+```yaml
+on:
+  pull_request:
+```
 
 ## Runner hardware and hosted runners
 
@@ -118,11 +143,11 @@ events are always enforced.
 
 ## Troubleshooting
 
-**First run / "No baseline found".** Expected: there is nothing to compare against yet. The action skips the comparison, notes it in the PR comment, and saves a baseline. On the next push to your default branch the baseline is committed and comparisons start working.
+**First run / "No baseline found".** Expected: there is nothing to compare against yet. The action skips the comparison and notes it in the PR comment. Open (or update) a PR against that branch — the action stages a baseline commit on the PR branch, which lands and comparisons start working once that PR merges.
 
 **Hardware mismatch / "comparison skipped".** Comparability is judged on the CPU fingerprint (`machine_info.cpu`), not the hostname, so a fresh runner node name alone does **not** skip. A genuinely different CPU does: by default (`enforce-same-node: "false"`) that comparison is **skipped** with a warning and `comparison-skipped=true` — which can happen when GitHub's hosted pool rotates CPU generations. Set `enforce-same-node: "true"` on a stable/self-hosted runner to turn a hardware mismatch into a hard failure. See [Runner hardware and hosted runners](#runner-hardware-and-hosted-runners).
 
-**Fork PRs don't update baselines.** By design: forks have no write access to your repo, so the baseline commit only happens on `push` events. The comparison and PR comment still run.
+**Fork PRs don't update baselines.** By design: the action can't push commits back to a fork, so the baseline-update commit is skipped for fork PRs. The comparison and PR comment still run — update the baseline manually afterward if needed.
 
 **Baseline commits re-triggering CI.** Baseline commit messages always end with `[skip ci]`. If your CI provider ignores that marker, exclude `chore(benchmark):` commits or the baselines directory from your triggers.
 

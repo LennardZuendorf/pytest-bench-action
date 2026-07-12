@@ -23,6 +23,106 @@ def action_text() -> str:
     return ACTION_YML.read_text(encoding="utf-8")
 
 
+class TestSanitizedTargetBranchOutput:
+    def test_sanitized_target_branch_exported(self, action_text):
+        assert "sanitized_target_branch=${SANITIZED_TARGET}" in action_text
+
+
+class TestCheckoutRefForPRs:
+    def test_checkout_uses_conditional_ref(self, action_text):
+        assert (
+            "ref: ${{ github.event_name == 'pull_request' && "
+            "(github.event.pull_request.head.repo.full_name == github.repository && "
+            "github.head_ref || github.event.pull_request.head.sha) || github.ref }}"
+        ) in action_text
+
+
+class TestCheckUpdateAgainstTargetBaseline:
+    def _step_block(self, action_text):
+        block = re.search(
+            r"- name: Check whether baseline needs updating\n(?:.*\n)+?\n    - name:",
+            action_text,
+        )
+        assert block, "step block not found"
+        return block.group(0)
+
+    def test_gated_on_pull_request(self, action_text):
+        assert "if: github.event_name == 'pull_request'" in self._step_block(action_text)
+
+    def test_compares_against_main_baseline_path(self, action_text):
+        block = self._step_block(action_text)
+        assert "steps.load-main-baseline.outputs.main_baseline_exists" in block
+        assert "steps.load-main-baseline.outputs.main_baseline_path" in block
+
+
+class TestSaveBaselineForTargetBranch:
+    def test_step_present(self, action_text):
+        assert "- name: Save baseline for target branch (PR only)" in action_text
+
+    def test_step_gated_and_uses_base_ref(self, action_text):
+        block = re.search(
+            r"- name: Save baseline for target branch \(PR only\)\n(?:.*\n)+?\n    - name:",
+            action_text,
+        )
+        assert block, "step block not found"
+        text = block.group(0)
+        assert (
+            "if: github.event_name == 'pull_request' && steps.check-update.outputs.should_update == 'true'"
+            in text
+        )
+        assert 'benchmark_baseline.py" save' in text
+        assert '"${{ github.base_ref }}"' in text
+
+
+class TestBaselineCommitLandsOnPRBranch:
+    def test_step_renamed(self, action_text):
+        assert "- name: Commit staged baseline to PR branch (same-repo PRs only)" in action_text
+        assert "Commit baseline (push events only)" not in action_text
+
+    def test_gated_on_same_repo_pull_request(self, action_text):
+        block = re.search(
+            r"- name: Commit staged baseline to PR branch \(same-repo PRs only\)\n(?:.*\n)+?\n    - name:",
+            action_text,
+        )
+        assert block, "step block not found"
+        text = block.group(0)
+        assert "github.event_name == 'pull_request'" in text
+        assert "steps.check-update.outputs.should_update == 'true'" in text
+        assert "github.event.pull_request.head.repo.full_name == github.repository" in text
+
+    def test_commit_scoped_to_single_baseline_file(self, action_text):
+        assert (
+            'add: "${{ inputs.baselines-dir }}/${{ steps.load-main-baseline.outputs.sanitized_target_branch }}.json"'
+            in action_text
+        )
+
+
+class TestBaselineUpdatedOutputGate:
+    def test_gated_on_same_repo_pull_request(self, action_text):
+        assert (
+            "SAME_REPO_PR=\"${{ github.event_name == 'pull_request' && "
+            'github.event.pull_request.head.repo.full_name == github.repository }}"'
+        ) in action_text
+        assert '[ "${UPDATE}" = "true" ] && [ "${SAME_REPO_PR}" = "true" ]' in action_text
+
+    def test_old_push_gate_removed(self, action_text):
+        assert (
+            '[ "${{ github.event_name }}" = "push" ] && [ "${UPDATE}" = "true" ]' not in action_text
+        )
+
+
+class TestForkAwareBaselineNote:
+    def test_is_fork_env_wired(self, action_text):
+        assert (
+            "IS_FORK: ${{ github.event.pull_request.head.repo.full_name != github.repository }}"
+            in action_text
+        )
+
+    def test_update_note_branches_on_fork(self, action_text):
+        assert "process.env.IS_FORK === 'true'" in action_text
+        assert "can't be committed back" in action_text
+
+
 class TestNewInputs:
     def test_enforce_same_node_declared(self, action_text):
         assert re.search(r"^\s{2}enforce-same-node:$", action_text, re.MULTILINE)
@@ -95,3 +195,29 @@ class TestSinglePrComment:
         assert "createComment" in action_text
         # delete must come before create in the script.
         assert action_text.index("deleteComment") < action_text.index("createComment")
+
+
+class TestBaselineCommitPushFailureIsNonFatal:
+    def _commit_step_block(self, action_text):
+        block = re.search(
+            r"- name: Commit staged baseline to PR branch \(same-repo PRs only\)\n(?:.*\n)+?\n    - name:",
+            action_text,
+        )
+        assert block, "step block not found"
+        return block.group(0)
+
+    def test_commit_step_has_id_and_continue_on_error(self, action_text):
+        block = self._commit_step_block(action_text)
+        assert "id: commit-baseline" in block
+        assert "continue-on-error: true" in block
+
+    def test_warning_step_exists_and_gated_on_failure(self, action_text):
+        assert "- name: Warn on baseline commit push failure" in action_text
+        block = re.search(
+            r"- name: Warn on baseline commit push failure\n(?:.*\n)+?(?=\n    - name:|\Z)",
+            action_text,
+        )
+        assert block, "warning step block not found"
+        text = block.group(0)
+        assert "if: steps.commit-baseline.outcome == 'failure'" in text
+        assert "::warning::" in text

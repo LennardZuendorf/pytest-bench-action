@@ -1,10 +1,10 @@
-name: pytest-bench-action
-description: Run pytest-benchmark, manage per-branch baselines, and post PR comparison comments.
+name: pytest Benchmark Baseline Check
+description: Regression-gate your pytest-benchmark suite with per-branch baselines, PR comparison comments, and a one-label override for intentional slowdowns.
 author: lennardzuendorf
 
 branding:
-  icon: activity
-  color: purple
+  icon: zap
+  color: orange
 
 inputs:
   python-version:
@@ -92,6 +92,7 @@ runs:
     - name: Checkout
       uses: actions/checkout@v4
       with:
+        ref: ${{ github.event_name == 'pull_request' && (github.event.pull_request.head.repo.full_name == github.repository && github.head_ref || github.event.pull_request.head.sha) || github.ref }}
         fetch-depth: 2
         token: ${{ inputs.github-token }}
 
@@ -140,6 +141,7 @@ runs:
       run: |
         TARGET_BRANCH="${{ github.base_ref }}"
         SANITIZED_TARGET=$(echo "${TARGET_BRANCH}" | tr '/\\. ' '_')
+        echo "sanitized_target_branch=${SANITIZED_TARGET}" >> "$GITHUB_OUTPUT"
         # Dedicated scratch file (not a branch name) so we never clobber a
         # committed baseline, whatever the base branch is called.
         BASELINE_PATH="${{ inputs.baselines-dir }}/_cross_baseline.json"
@@ -253,19 +255,18 @@ runs:
         fi
 
     - name: Check whether baseline needs updating
+      if: github.event_name == 'pull_request'
       shell: bash
       id: check-update
       run: |
         SCRIPT_DIR="${{ github.action_path }}/scripts"
-        SANITIZED="${{ steps.branch.outputs.sanitized_branch }}"
-        BASELINE_FILE="${{ inputs.baselines-dir }}/${SANITIZED}.json"
 
-        if [ ! -f "${BASELINE_FILE}" ]; then
+        if [ "${{ steps.load-main-baseline.outputs.main_baseline_exists }}" != "true" ]; then
           echo "should_update=true" >> "$GITHUB_OUTPUT"
-          echo "No existing baseline — will create."
+          echo "No existing baseline for '${{ github.base_ref }}' — will create."
         else
           if python "${SCRIPT_DIR}/benchmark_compare.py" compare-json \
-            "${BASELINE_FILE}" \
+            "${{ steps.load-main-baseline.outputs.main_baseline_path }}" \
             "${{ inputs.benchmark-results-file }}" \
             --tolerance="${{ inputs.update-tolerance }}" \
             > /dev/null 2>&1; then
@@ -286,16 +287,37 @@ runs:
           "${{ inputs.benchmark-results-file }}" \
           --baselines-dir="${{ inputs.baselines-dir }}"
 
-    - name: Commit baseline (push events only)
-      if: github.event_name == 'push' && steps.check-update.outputs.should_update == 'true'
+    - name: Save baseline for target branch (PR only)
+      if: github.event_name == 'pull_request' && steps.check-update.outputs.should_update == 'true'
+      shell: bash
+      run: |
+        SCRIPT_DIR="${{ github.action_path }}/scripts"
+        python "${SCRIPT_DIR}/benchmark_baseline.py" save \
+          "${{ github.base_ref }}" \
+          "${{ inputs.benchmark-results-file }}" \
+          --baselines-dir="${{ inputs.baselines-dir }}"
+
+    - name: Commit staged baseline to PR branch (same-repo PRs only)
+      id: commit-baseline
+      if: >-
+        github.event_name == 'pull_request' &&
+        steps.check-update.outputs.should_update == 'true' &&
+        github.event.pull_request.head.repo.full_name == github.repository
+      continue-on-error: true
       uses: EndBug/add-and-commit@v9
       with:
-        add: "${{ inputs.baselines-dir }}/"
+        add: "${{ inputs.baselines-dir }}/${{ steps.load-main-baseline.outputs.sanitized_target_branch }}.json"
         default_author: github_actions
         message: >-
-          chore(benchmark): update baseline for branch "${{ steps.branch.outputs.current_branch }}"
+          chore(benchmark): update baseline for branch "${{ github.base_ref }}"
           (node: ${{ steps.extract-node.outputs.node }}) [skip ci]
         push: true
+
+    - name: Warn on baseline commit push failure
+      if: steps.commit-baseline.outcome == 'failure'
+      shell: bash
+      run: |
+        echo "::warning::Baseline commit could not be pushed (likely a concurrent push to this branch, e.g. from another bot). The compare/regression result above is unaffected — the baseline will be retried on the next run."
 
     - name: Set outputs
       shell: bash
@@ -330,7 +352,8 @@ runs:
         fi
 
         UPDATE="${{ steps.check-update.outputs.should_update }}"
-        if [ "${{ github.event_name }}" = "push" ] && [ "${UPDATE}" = "true" ]; then
+        SAME_REPO_PR="${{ github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository }}"
+        if [ "${UPDATE}" = "true" ] && [ "${SAME_REPO_PR}" = "true" ]; then
           echo "baseline-updated=true" >> "$GITHUB_OUTPUT"
         else
           echo "baseline-updated=false" >> "$GITHUB_OUTPUT"
@@ -357,6 +380,7 @@ runs:
         OVERRIDE_LABEL: ${{ inputs.override-label }}
         MAIN_COMPARISON_SKIPPED: ${{ steps.compare-main.outputs.main_comparison_skipped }}
         PREV_COMPARISON_SKIPPED: ${{ steps.compare-prev.outputs.prev_comparison_skipped }}
+        IS_FORK: ${{ github.event.pull_request.head.repo.full_name != github.repository }}
       with:
         github-token: ${{ inputs.github-token }}
         script: |
@@ -424,9 +448,12 @@ runs:
             prevSection = `#### vs Current Branch Baseline (${process.env.CROSS_BRANCH_TOLERANCE}% tolerance)\n\`\`\`\n${prevComparison}\`\`\``;
           }
 
-          const updateNote = process.env.SHOULD_UPDATE === 'true'
-            ? `💾 **Baseline Update:** Will be updated on merge`
-            : `⏭️ **Baseline Update:** Skipped (within ${process.env.UPDATE_TOLERANCE}% threshold)`;
+          const isFork = process.env.IS_FORK === 'true';
+          const updateNote = process.env.SHOULD_UPDATE !== 'true'
+            ? `⏭️ **Baseline Update:** Skipped (within ${process.env.UPDATE_TOLERANCE}% threshold)`
+            : isFork
+              ? `⚠️ **Baseline Update:** Change detected, but this PR is from a fork — baselines can't be committed back. Update it manually after merging if needed.`
+              : `💾 **Baseline Update:** Staged on this branch — will land on \`${process.env.BASE_REF}\` when this PR merges.`;
 
           const regressionNote = process.env.REGRESSION_DETECTED !== 'true'
             ? ''

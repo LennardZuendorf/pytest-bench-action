@@ -26,7 +26,7 @@
 - **ALWAYS test with a real `pytest-benchmark` JSON** before pushing
 - **ALWAYS include `[skip ci]` in baseline commit messages** — prevents infinite CI loops
 - **NEVER compare across machines** — node mismatch must exit with a clear error
-- **NEVER commit baselines on PR events** — only save to working tree on PRs
+- **NEVER push a baseline commit directly to the target/protected branch** — stage it on the PR branch itself (same-repo PRs only) so it lands via the normal PR merge
 - **NEVER use third-party Python packages in `scripts/`** — stdlib only
 - **NEVER proceed without user confirmation**
 
@@ -126,9 +126,11 @@ python scripts/benchmark_compare.py compare-json \
 - Write to `<baselines-dir>/<sanitized_branch>.json`
 
 ### 8. Commit Baseline
-- **Only on `push` events** AND `should_update == 'true'`
-- Uses `EndBug/add-and-commit@v9`
+- **Only on `pull_request` events**, `should_update == 'true'`, and same-repo (not a fork)
+- `should_update` compares this PR's results against the **target branch's** committed baseline
+- Commits the staged file (named after the **target** branch, e.g. `main.json`) **onto the PR branch** via `EndBug/add-and-commit@v9` — never a direct push to the target/protected branch
 - Message: `chore(benchmark): update baseline for branch "..." (node: ...) [skip ci]`
+- Lands on the target branch automatically when the PR merges — no separate post-merge rerun
 
 ### 9. Post PR Comment
 - **Only on `pull_request` events**
@@ -163,7 +165,7 @@ python scripts/benchmark_compare.py compare-json \
 | Different node than baseline | Fail with clear error, do not compare |
 | Benchmark removed from suite | Mark MISSING, fail |
 | New benchmark not in baseline | Mark NEW, pass |
-| Push to main | Compare HEAD~1; commit new baseline if changed |
+| PR merges | Staged baseline commit (already part of the PR) lands on the target branch — no rerun |
 | PR from fork | Skip baseline commit, still post comment |
 | `[skip ci]` loop | Commit message includes `[skip ci]` |
 
@@ -207,7 +209,7 @@ cat action.yml
 
 ### DON'T ❌
 - NEVER use third-party packages in `scripts/` — no `pip install` in the action
-- NEVER commit baselines on PR events
+- NEVER push a baseline commit directly to a protected/target branch — stage it on the PR branch so it lands via merge
 - NEVER compare benchmarks across different machines
 - NEVER fail the action when a baseline doesn't exist yet (first run)
 - NEVER use `actions/upload-artifact@v4` or older — use v5
