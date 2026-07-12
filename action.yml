@@ -297,14 +297,17 @@ runs:
           "${{ inputs.benchmark-results-file }}" \
           --baselines-dir="${{ inputs.baselines-dir }}"
 
-    - name: Commit baseline (push events only)
-      if: github.event_name == 'push' && steps.check-update.outputs.should_update == 'true'
+    - name: Commit staged baseline to PR branch (same-repo PRs only)
+      if: >-
+        github.event_name == 'pull_request' &&
+        steps.check-update.outputs.should_update == 'true' &&
+        github.event.pull_request.head.repo.full_name == github.repository
       uses: EndBug/add-and-commit@v9
       with:
-        add: "${{ inputs.baselines-dir }}/"
+        add: "${{ inputs.baselines-dir }}/${{ steps.load-main-baseline.outputs.sanitized_target_branch }}.json"
         default_author: github_actions
         message: >-
-          chore(benchmark): update baseline for branch "${{ steps.branch.outputs.current_branch }}"
+          chore(benchmark): update baseline for branch "${{ github.base_ref }}"
           (node: ${{ steps.extract-node.outputs.node }}) [skip ci]
         push: true
 

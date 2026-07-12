@@ -71,6 +71,29 @@ class TestSaveBaselineForTargetBranch:
         assert '"${{ github.base_ref }}"' in text
 
 
+class TestBaselineCommitLandsOnPRBranch:
+    def test_step_renamed(self, action_text):
+        assert "- name: Commit staged baseline to PR branch (same-repo PRs only)" in action_text
+        assert "Commit baseline (push events only)" not in action_text
+
+    def test_gated_on_same_repo_pull_request(self, action_text):
+        block = re.search(
+            r"- name: Commit staged baseline to PR branch \(same-repo PRs only\)\n(?:.*\n)+?\n    - name:",
+            action_text,
+        )
+        assert block, "step block not found"
+        text = block.group(0)
+        assert "github.event_name == 'pull_request'" in text
+        assert "steps.check-update.outputs.should_update == 'true'" in text
+        assert "github.event.pull_request.head.repo.full_name == github.repository" in text
+
+    def test_commit_scoped_to_single_baseline_file(self, action_text):
+        assert (
+            'add: "${{ inputs.baselines-dir }}/${{ steps.load-main-baseline.outputs.sanitized_target_branch }}.json"'
+            in action_text
+        )
+
+
 class TestNewInputs:
     def test_enforce_same_node_declared(self, action_text):
         assert re.search(r"^\s{2}enforce-same-node:$", action_text, re.MULTILINE)
