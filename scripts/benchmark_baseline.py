@@ -38,7 +38,7 @@ def save(branch: str, results_file: str, baselines_dir: str = ".benchmarks/basel
     baselines_path.mkdir(parents=True, exist_ok=True)
 
     out_file = baselines_path / f"{sanitize_branch(branch)}.json"
-    out_file.write_text(json.dumps(data, indent=2), encoding="utf-8")
+    out_file.write_text(json.dumps(data, indent=2) + "\n", encoding="utf-8")
     print(f"Saved baseline: {out_file} (node={node})")
 
 

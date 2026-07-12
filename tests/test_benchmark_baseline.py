@@ -84,6 +84,18 @@ class TestSave:
             assert result.returncode == 0
         assert len(list(tmp_path.glob("*.json"))) == 1
 
+    def test_saved_file_ends_with_newline(self, run_script, fixtures_dir, tmp_path):
+        run_script(
+            SCRIPT,
+            "save",
+            "main",
+            str(fixtures_dir / "results.json"),
+            f"--baselines-dir={tmp_path}",
+        )
+        raw = (tmp_path / "main.json").read_bytes()
+        assert raw.endswith(b"\n")
+        assert not raw.endswith(b"\n\n")
+
     def test_unicode_names_round_trip_utf8(self, run_script, write_json, tmp_path):
         # Non-ASCII benchmark names must survive save/load regardless of locale
         # (scripts read/write with explicit utf-8).

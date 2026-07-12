@@ -6,7 +6,22 @@
 #
 # Ruff lints (--fix) and formats the Python helper scripts + tests; ty
 # type-checks them. Ruff config lives in ruff.toml, ty config in ty.toml.
+#
+# .benchmarks/baselines/*.json is bot-committed generated data (see
+# scripts/benchmark_baseline.py). It's excluded from end-of-file-fixer and
+# trailing-whitespace so a machine-written file can't fail CI on
+# whitespace it didn't choose; check-json still runs on it as a
+# corruption safety net.
 repos:
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v5.0.0
+    hooks:
+      - id: end-of-file-fixer
+        exclude: ^\.benchmarks/baselines/
+      - id: trailing-whitespace
+        exclude: ^\.benchmarks/baselines/
+      - id: check-json
+
   - repo: https://github.com/astral-sh/ruff-pre-commit
     rev: v0.15.8
     hooks:
