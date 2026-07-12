@@ -1,5 +1,5 @@
 name: pytest Benchmark Baseline Check
-description: Regression-gate your pytest-benchmark suite with per-branch baselines, PR comparison comments, and a one-label override for intentional slowdowns.
+description: Regression-gate pytest-benchmark with per-branch baselines, PR comparison comments, and an override label.
 author: lennardzuendorf
 
 branding:
