@@ -344,7 +344,8 @@ runs:
         fi
 
         UPDATE="${{ steps.check-update.outputs.should_update }}"
-        if [ "${{ github.event_name }}" = "push" ] && [ "${UPDATE}" = "true" ]; then
+        SAME_REPO_PR="${{ github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository }}"
+        if [ "${UPDATE}" = "true" ] && [ "${SAME_REPO_PR}" = "true" ]; then
           echo "baseline-updated=true" >> "$GITHUB_OUTPUT"
         else
           echo "baseline-updated=false" >> "$GITHUB_OUTPUT"
