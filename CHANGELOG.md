@@ -3,7 +3,7 @@
 All notable changes to pytest-bench-action are documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/); versions follow [SemVer](https://semver.org/).
 
-## [1.0.0] — Unreleased
+## [1.0.0] — 2026-07-12
 
 First public release.
 
