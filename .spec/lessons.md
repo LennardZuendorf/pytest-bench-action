@@ -1,6 +1,6 @@
 ---
 type: lessons
-updated: 2026-06-09
+updated: 2026-07-11
 ---
 
 # pytest-bench-action — Lessons & Gotchas
@@ -15,8 +15,8 @@ session. Tags make entries retrievable — scan for tags matching the work in ha
 ### 1. `[skip ci]` is non-negotiable
 The action commits baselines back to the repo. Without `[skip ci]` in the commit message, the push triggers another CI run, which triggers another baseline commit, forever. This has burned us before. Every baseline commit message must end with `[skip ci]`.
 
-### 2. Never compare across machines
-`machine_info.node` in the benchmark JSON is the runner hostname. If you compare a baseline from `runner-abc` against results from `runner-xyz`, the numbers mean nothing — runner specs vary. The node check in `benchmark_compare.py` is a hard exit, not a warning. Do not soften it.
+### 2. Gate comparability on hardware, not the hostname — and never fake a cross-machine comparison
+The original gate compared `machine_info.node` (the runner hostname). That was the *wrong signal*: GitHub-hosted runners randomize the hostname every job, so cross-run comparison **false-failed forever after the first run** — the core feature was broken on the most common runner. Fix: key comparability on a **CPU/system fingerprint** (`machine_key()` = `cpu.brand_raw` + `arch` + `count` + `system`), falling back to `node` only when no `cpu` block exists. Same hardware compares even with a fresh hostname; genuinely different hardware is still rejected. Gotcha found in review: don't blend `system` into the fingerprint when there's no `cpu` block — a legacy payload with `system` but no `cpu` would key differently from a node-only payload; require a real `cpu` block before fingerprinting, else fall back to `node`. The script still exits with a **dedicated code (`3` = `NODE_MISMATCH_EXIT`)**, not `1`, so the action tells "cannot compare" from "regressed", and `enforce-same-node` (default `"false"`) skips-with-`::warning::` vs hard-fails (`"true"`). The rule that survives everything: **never emit a comparison across different machines** — skip it or fail, never fake it.
 
 ### 3. Stdlib only in `scripts/`
 The action scripts run inside the caller's environment. We have no control over what's installed. Adding any `import requests` or similar will silently break every caller that doesn't have it. `json`, `pathlib`, `sys`, `datetime` — that's the full list.
@@ -44,6 +44,12 @@ The cross-branch comparison uses `github.base_ref`, and a repo's default branch 
 
 ### 11. Never template-expand workflow inputs into `run:` scripts
 `${{ github.event.inputs.x }}` inside a `run:` block is string-substituted before the shell sees it — a crafted input is shell injection, and it executes *before* any in-script validation. Route inputs through `env:` (`env: VERSION: ${{ inputs.version }}`) and reference `"$VERSION"` in the script. Applied in `release.yml`.
+
+### 12. Waive accepted regressions per-PR, never with a blanket toggle
+When a PR is intentionally slower, loosening `cross-branch-tolerance` / `threshold-map` weakens detection for the whole repo. The `override-label` (default `benchmark-override`) waives the regression for **that one PR only** — still reported in the comment (`regression-overridden=true`), just non-blocking, and self-clearing when the label is removed. Read the label from the event payload (`contains(github.event.pull_request.labels.*.name, inputs.override-label)`), not an API call, and gate it on `github.event_name == 'pull_request'`. Never ship a repo-wide "ignore regressions" boolean that can be left on by default.
+
+### 13. Distinct exit codes are the cleanest cross-layer signal
+The action layer couldn't tell a node mismatch (`exit 1`) from a real regression (`exit 1`) — both looked identical, so a mismatch false-failed the job. Giving the script a **dedicated exit code** (`3`) for "cannot compare" let the shell branch on it (`[ "$EXIT_CODE" -eq 3 ]`) with no fragile stdout grepping. Matches the repo's "exit codes are the API" philosophy. When a script needs to tell a wrapper *why* it failed, add a code — don't parse messages.
 
 ---
 

@@ -1,18 +1,31 @@
 """Tests for scripts/benchmark_compare.py (compare-json command)."""
 
 import pytest
-
-from benchmark_compare import format_time
+from benchmark_compare import NODE_MISMATCH_EXIT, format_time, machine_key
 from conftest import make_results
 
 SCRIPT = "benchmark_compare.py"
 
 
+def with_cpu(brand: str, node: str, benchmarks: dict) -> dict:
+    """A results payload carrying a real cpu block (like pytest-benchmark 5.x)."""
+    return {
+        "machine_info": {
+            "node": node,
+            "system": "Linux",
+            "cpu": {"brand_raw": brand, "arch": "X86_64", "count": 4},
+        },
+        "benchmarks": [{"name": n, "stats": {"mean": m}} for n, m in benchmarks.items()],
+    }
+
+
 class TestPassFail:
     def test_within_tolerance_passes(self, run_script, fixtures_dir):
         result = run_script(
-            SCRIPT, "compare-json",
-            str(fixtures_dir / "baseline.json"), str(fixtures_dir / "results.json"),
+            SCRIPT,
+            "compare-json",
+            str(fixtures_dir / "baseline.json"),
+            str(fixtures_dir / "results.json"),
             "--tolerance=20",
         )
         assert result.returncode == 0
@@ -21,8 +34,10 @@ class TestPassFail:
 
     def test_regression_fails(self, run_script, fixtures_dir):
         result = run_script(
-            SCRIPT, "compare-json",
-            str(fixtures_dir / "baseline.json"), str(fixtures_dir / "results_regression.json"),
+            SCRIPT,
+            "compare-json",
+            str(fixtures_dir / "baseline.json"),
+            str(fixtures_dir / "results_regression.json"),
             "--tolerance=20",
         )
         assert result.returncode == 1
@@ -54,8 +69,10 @@ class TestPassFail:
 
     def test_default_tolerance_is_20(self, run_script, fixtures_dir):
         result = run_script(
-            SCRIPT, "compare-json",
-            str(fixtures_dir / "baseline.json"), str(fixtures_dir / "results_regression.json"),
+            SCRIPT,
+            "compare-json",
+            str(fixtures_dir / "baseline.json"),
+            str(fixtures_dir / "results_regression.json"),
         )
         assert result.returncode == 1
         assert "20.0% tolerance" in result.stdout
@@ -64,8 +81,10 @@ class TestPassFail:
 class TestNewAndMissing:
     def test_new_benchmark_passes(self, run_script, fixtures_dir):
         result = run_script(
-            SCRIPT, "compare-json",
-            str(fixtures_dir / "baseline.json"), str(fixtures_dir / "results_new_benchmark.json"),
+            SCRIPT,
+            "compare-json",
+            str(fixtures_dir / "baseline.json"),
+            str(fixtures_dir / "results_new_benchmark.json"),
             "--tolerance=20",
         )
         assert result.returncode == 0
@@ -75,8 +94,10 @@ class TestNewAndMissing:
     def test_missing_benchmark_fails(self, run_script, fixtures_dir, write_json):
         current = write_json("current.json", make_results(benchmarks={"test_foo": 0.001}))
         result = run_script(
-            SCRIPT, "compare-json",
-            str(fixtures_dir / "baseline.json"), str(current),
+            SCRIPT,
+            "compare-json",
+            str(fixtures_dir / "baseline.json"),
+            str(current),
             "--tolerance=20",
         )
         assert result.returncode == 1
@@ -85,30 +106,99 @@ class TestNewAndMissing:
 
 
 class TestNodeCheck:
-    def test_node_mismatch_fails(self, run_script, fixtures_dir, write_json):
+    def test_node_mismatch_uses_distinct_exit_code(self, run_script, fixtures_dir, write_json):
+        # A node mismatch means "cannot compare", NOT "regressed". It must exit
+        # with the dedicated NODE_MISMATCH_EXIT (3) so the action can skip the
+        # comparison (enforce-same-node: false) instead of failing the job.
         current = write_json(
-            "current.json", make_results(node="runner-xyz", benchmarks={"test_foo": 0.001, "test_bar": 0.0005})
+            "current.json",
+            make_results(node="runner-xyz", benchmarks={"test_foo": 0.001, "test_bar": 0.0005}),
         )
         result = run_script(
-            SCRIPT, "compare-json",
-            str(fixtures_dir / "baseline.json"), str(current),
+            SCRIPT,
+            "compare-json",
+            str(fixtures_dir / "baseline.json"),
+            str(current),
             "--tolerance=20",
         )
-        assert result.returncode == 1
+        assert result.returncode == NODE_MISMATCH_EXIT
+        assert result.returncode == 3
         assert "cross-machine comparison is invalid" in result.stderr
         assert "runner-abc" in result.stderr
         assert "runner-xyz" in result.stderr
 
+    def test_node_mismatch_exit_code_differs_from_regression(
+        self, run_script, fixtures_dir, write_json
+    ):
+        # Guard the whole point of the distinct code: a real regression (same
+        # node) exits 1, a node mismatch exits 3 — never conflated.
+        regression = run_script(
+            SCRIPT,
+            "compare-json",
+            str(fixtures_dir / "baseline.json"),
+            str(fixtures_dir / "results_regression.json"),
+            "--tolerance=20",
+        )
+        mismatch_current = write_json(
+            "mismatch.json",
+            make_results(node="runner-xyz", benchmarks={"test_foo": 0.001, "test_bar": 0.0005}),
+        )
+        mismatch = run_script(
+            SCRIPT,
+            "compare-json",
+            str(fixtures_dir / "baseline.json"),
+            str(mismatch_current),
+            "--tolerance=20",
+        )
+        assert regression.returncode == 1
+        assert mismatch.returncode == NODE_MISMATCH_EXIT
+        assert regression.returncode != mismatch.returncode
+
     def test_missing_node_on_one_side_proceeds(self, run_script, fixtures_dir, write_json):
         current = write_json(
-            "current.json", make_results(node="", benchmarks={"test_foo": 0.001, "test_bar": 0.0005})
+            "current.json",
+            make_results(node="", benchmarks={"test_foo": 0.001, "test_bar": 0.0005}),
         )
         result = run_script(
-            SCRIPT, "compare-json",
-            str(fixtures_dir / "baseline.json"), str(current),
+            SCRIPT,
+            "compare-json",
+            str(fixtures_dir / "baseline.json"),
+            str(current),
             "--tolerance=20",
         )
         assert result.returncode == 0
+
+
+class TestHardwareFingerprint:
+    """The gate keys on hardware (cpu.brand_raw + arch + count + system), not the
+    hostname, so hosted runners with a fresh node name still compare."""
+
+    def test_machine_key_prefers_cpu_over_node(self):
+        # Same CPU, different hostname → same key (comparable).
+        a = with_cpu("Xeon 8370C", "host-A", {"t": 0.01})
+        b = with_cpu("Xeon 8370C", "host-B", {"t": 0.01})
+        assert machine_key(a) == machine_key(b)
+        # Different CPU → different key (not comparable).
+        c = with_cpu("EPYC 7763", "host-A", {"t": 0.01})
+        assert machine_key(a) != machine_key(c)
+
+    def test_machine_key_falls_back_to_node_without_cpu(self):
+        assert machine_key(make_results(node="runner-abc")) == "runner-abc"
+        assert machine_key({"machine_info": {}}) is None
+
+    def test_same_cpu_different_node_compares(self, run_script, write_json):
+        base = write_json("base.json", with_cpu("Xeon 8370C", "host-A", {"t": 0.010}))
+        cur = write_json("cur.json", with_cpu("Xeon 8370C", "host-B", {"t": 0.0105}))
+        result = run_script(SCRIPT, "compare-json", str(base), str(cur), "--tolerance=20")
+        assert result.returncode == 0, result.stderr
+        assert "✅ PASS" in result.stdout
+
+    def test_different_cpu_cannot_compare(self, run_script, write_json):
+        base = write_json("base.json", with_cpu("Xeon 8370C", "host-A", {"t": 0.010}))
+        cur = write_json("cur.json", with_cpu("EPYC 7763", "host-A", {"t": 0.0105}))
+        result = run_script(SCRIPT, "compare-json", str(base), str(cur), "--tolerance=20")
+        assert result.returncode == NODE_MISMATCH_EXIT
+        assert "cross-machine comparison is invalid" in result.stderr
 
 
 class TestErrorHandling:
@@ -128,8 +218,10 @@ class TestErrorHandling:
 
     def test_invalid_tolerance_exits_1(self, run_script, fixtures_dir):
         result = run_script(
-            SCRIPT, "compare-json",
-            str(fixtures_dir / "baseline.json"), str(fixtures_dir / "results.json"),
+            SCRIPT,
+            "compare-json",
+            str(fixtures_dir / "baseline.json"),
+            str(fixtures_dir / "results.json"),
             "--tolerance=lots",
         )
         assert result.returncode == 1

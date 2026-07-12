@@ -4,6 +4,12 @@ A reusable GitHub Action that runs `pytest-benchmark`, manages per-branch baseli
 
 ## Usage
 
+Add the action as a step in a workflow file in your repository — create
+`.github/workflows/benchmark.yml` (any name works) and drop this step into a
+job. The action does its own checkout, so it's the only step you need. For a
+complete, copy-pasteable job (triggers, permissions, runner) see
+[docs/example-workflow.yml](docs/example-workflow.yml).
+
 ```yaml
 - uses: lennardzuendorf/pytest-bench-action@v1
   with:
@@ -17,6 +23,11 @@ A reusable GitHub Action that runs `pytest-benchmark`, manages per-branch baseli
     threshold-map: '{"e2e_create": 30.0, "e2e_search": 5.0, "help": 0.5}'
     cross-branch-tolerance: 20
     update-tolerance: 5
+    # Comparability is judged on the CPU fingerprint, not the hostname, so
+    # hosted runners compare cleanly on the same CPU. "false" skips (with a
+    # warning) on a genuine hardware mismatch; set "true" on a stable/self-hosted
+    # runner to fail on one instead.
+    enforce-same-node: "false"
 ```
 
 ## Inputs
@@ -33,14 +44,18 @@ A reusable GitHub Action that runs `pytest-benchmark`, manages per-branch baseli
 | `baselines-dir` | No | `.benchmarks/baselines` | Repo-relative path where baseline JSONs are stored |
 | `github-token` | **Yes** | — | `${{ secrets.GITHUB_TOKEN }}` |
 | `threshold-map` | No | `""` | JSON string mapping test name substrings to max-seconds thresholds |
+| `enforce-same-node` | No | `"false"` | Hardware-mismatch handling. Comparability is judged on the CPU fingerprint, not the hostname. `"true"` fails the job on a genuinely different CPU (stable/self-hosted runners); `"false"` skips that comparison with a warning. See [Runner hardware](#runner-hardware-and-hosted-runners). |
+| `override-label` | No | `benchmark-override` | PR label that waives a regression for that one PR — the regression is still reported but does not fail the job. See [Accepting a known regression](#accepting-a-known-regression). |
 
 ## Outputs
 
 | Output | Description |
 |--------|-------------|
-| `regression-detected` | `"true"` / `"false"` |
-| `baseline-updated` | `"true"` / `"false"` |
+| `regression-detected` | `"true"` / `"false"` — a benchmark exceeded tolerance |
+| `baseline-updated` | `"true"` / `"false"` — a baseline commit was made |
 | `node` | Hostname extracted from `machine_info.node` |
+| `comparison-skipped` | `"true"` / `"false"` — a comparison was skipped because it ran on a different runner node (`enforce-same-node: false`) |
+| `regression-overridden` | `"true"` / `"false"` — a regression was detected but waived by the override label |
 
 ## Required Permissions
 
@@ -61,11 +76,51 @@ permissions:
 
 The action checks out your repository itself (`fetch-depth: 2`); you don't need a separate `actions/checkout` step. See [docs/example-workflow.yml](docs/example-workflow.yml) for a complete reference workflow.
 
+## Runner hardware and hosted runners
+
+Timing numbers are only comparable on the same hardware. The action judges
+comparability on a **CPU/system fingerprint** — `machine_info.cpu.brand_raw` +
+`arch` + core count + `system` — **not** the hostname (`machine_info.node`). The
+hostname is randomized on every GitHub-hosted job, so keying on it would skip
+every comparison after the first; the CPU fingerprint is stable across those
+ephemeral hostnames, so two `ubuntu-latest` runs on the same CPU model compare
+cleanly. (When a run predates the `cpu` block — minimal/legacy output — it falls
+back to the hostname.)
+
+`enforce-same-node` decides what happens when the current run's **hardware**
+differs from the baseline's:
+
+- **`enforce-same-node: "false"` (default)** — the comparison is **skipped** with
+  a `::warning::`, a PR-comment note, and `comparison-skipped=true`. The job does
+  **not** fail. Sensible default for hosted runners.
+- **`enforce-same-node: "true"`** — a hardware mismatch **fails** the job. Use on
+  a **stable/self-hosted runner**, where a different CPU is a real misconfiguration.
+
+Caveat: GitHub rotates its hosted pool across CPU generations, so occasionally
+two `ubuntu-latest` jobs land on different CPUs and the comparison is skipped;
+and shared-VM noise is not removed by fingerprinting (the `cross-branch-tolerance`
+absorbs it). For the most reliable numbers, use a stable/self-hosted runner and
+set `enforce-same-node: "true"`.
+
+## Accepting a known regression
+
+Sometimes a PR is intentionally slower and you want to merge it anyway without
+loosening tolerances for the whole repo. Add the **`benchmark-override`** label
+(configurable via `override-label`) to that pull request:
+
+- the regression is **still detected and still shown** in the PR comment (marked
+  as overridden) and in the `regression-overridden` output;
+- but the **job does not fail**.
+
+The waiver is scoped to that one PR and self-clearing — remove the label to
+re-enforce. It only applies on `pull_request` events; regressions on `push`
+events are always enforced.
+
 ## Troubleshooting
 
 **First run / "No baseline found".** Expected: there is nothing to compare against yet. The action skips the comparison, notes it in the PR comment, and saves a baseline. On the next push to your default branch the baseline is committed and comparisons start working.
 
-**"cross-machine comparison is invalid" (node mismatch).** Baselines are tied to the runner hostname (`machine_info.node` in the benchmark JSON). Comparing numbers from different machines is meaningless, so the action fails hard instead. GitHub-hosted runners get a fresh hostname per job — for stable comparisons use a self-hosted runner (or any runner with a fixed hostname).
+**Hardware mismatch / "comparison skipped".** Comparability is judged on the CPU fingerprint (`machine_info.cpu`), not the hostname, so a fresh runner node name alone does **not** skip. A genuinely different CPU does: by default (`enforce-same-node: "false"`) that comparison is **skipped** with a warning and `comparison-skipped=true` — which can happen when GitHub's hosted pool rotates CPU generations. Set `enforce-same-node: "true"` on a stable/self-hosted runner to turn a hardware mismatch into a hard failure. See [Runner hardware and hosted runners](#runner-hardware-and-hosted-runners).
 
 **Fork PRs don't update baselines.** By design: forks have no write access to your repo, so the baseline commit only happens on `push` events. The comparison and PR comment still run.
 
@@ -73,7 +128,7 @@ The action checks out your repository itself (`fetch-depth: 2`); you don't need 
 
 **`python-version` not available on the runner.** The default tracks the latest stable Python (currently `"3.14"`). On older runner images, pin `python-version: "3.12"` or `"3.13"`.
 
-**Job fails with "Performance regression detected".** Working as intended — one or more benchmarks exceeded `cross-branch-tolerance` vs the baseline, or a benchmark present in the baseline is missing from the run. The PR comment and the step log contain the full comparison table.
+**Job fails with "Performance regression detected".** Working as intended — one or more benchmarks exceeded `cross-branch-tolerance` vs the baseline, or a benchmark present in the baseline is missing from the run. The PR comment and the step log contain the full comparison table. If the slow-down is intentional and you want to merge anyway, add the `benchmark-override` label to the PR (see [Accepting a known regression](#accepting-a-known-regression)) instead of loosening tolerances for the whole repo.
 
 **My default branch isn't `main`.** Supported. The cross-branch comparison uses the PR's actual base branch (`github.base_ref`), and the PR comment is labelled accordingly. You just need a baseline committed on that branch (it appears after the first push to it).
 

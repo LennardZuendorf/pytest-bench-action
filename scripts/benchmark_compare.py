@@ -4,6 +4,50 @@
 import json
 import sys
 
+# Exit-code contract (exit codes are the API — see .spec/tech.md):
+#   0 = all benchmarks within tolerance (or NEW)
+#   1 = a real result: regression beyond tolerance and/or a MISSING benchmark,
+#       or an I/O error (unreadable/malformed file, bad --tolerance)
+#   3 = cannot compare: baseline and current ran on different hardware.
+#       Distinct from 1 so callers can distinguish "compared and it regressed"
+#       from "no valid comparison was possible". The action.yml wrapper decides
+#       whether this hard-fails (enforce-same-node: true) or skips with a
+#       warning (enforce-same-node: false). We NEVER emit a cross-machine
+#       comparison either way.
+NODE_MISMATCH_EXIT = 3
+
+
+def machine_key(data: dict) -> str | None:
+    """A stable identity for the hardware a run executed on.
+
+    Prefer the actual CPU/system identity (``machine_info.cpu``) over
+    ``machine_info.node``. The ``node`` is the hostname, which GitHub-hosted
+    runners randomize on every job — keying on it made every hosted-runner
+    comparison after the first look like a different machine and skip/fail. The
+    CPU brand + arch + core count + OS is stable across those ephemeral
+    hostnames, so two ``ubuntu-latest`` runs on the same CPU model compare
+    cleanly while genuinely different hardware is still rejected.
+
+    Falls back to ``node`` when no ``cpu`` block is present (minimal or legacy
+    payloads, e.g. hand-written fixtures). Returns ``None`` when neither is
+    available, in which case the caller proceeds without a hardware gate.
+    """
+    mi = data.get("machine_info", {}) or {}
+    cpu = mi.get("cpu") or {}
+    if cpu:
+        parts = [
+            str(cpu.get("brand_raw", "")).strip(),
+            str(cpu.get("arch", "")).strip(),
+            str(cpu.get("count", "")).strip(),
+            str(mi.get("system", "")).strip(),
+        ]
+        fingerprint = "|".join(p for p in parts if p)
+        if fingerprint:
+            return fingerprint
+    # No cpu block (minimal / legacy payload): fall back to the hostname.
+    node = mi.get("node")
+    return node or None
+
 
 def format_time(seconds: float) -> str:
     if seconds < 0.001:
@@ -16,29 +60,33 @@ def format_time(seconds: float) -> str:
 def compare_json(baseline_file: str, current_file: str, tolerance: float) -> bool:
     """Compare two benchmark JSON files. Returns True if all passed."""
     try:
-        baseline_data = json.loads(open(baseline_file, encoding="utf-8").read())
+        with open(baseline_file, encoding="utf-8") as f:
+            baseline_data = json.load(f)
     except Exception as e:
         print(f"ERROR: cannot load baseline file '{baseline_file}': {e}", file=sys.stderr)
         sys.exit(1)
 
     try:
-        current_data = json.loads(open(current_file, encoding="utf-8").read())
+        with open(current_file, encoding="utf-8") as f:
+            current_data = json.load(f)
     except Exception as e:
         print(f"ERROR: cannot load current results file '{current_file}': {e}", file=sys.stderr)
         sys.exit(1)
 
-    # Node consistency check
-    baseline_node = baseline_data.get("machine_info", {}).get("node")
-    current_node = current_data.get("machine_info", {}).get("node")
-    if baseline_node and current_node and baseline_node != current_node:
+    # Hardware consistency check. We compare on the CPU/system fingerprint, not
+    # the hostname, so the same hardware compares cleanly even when the runner's
+    # node name changes between jobs (as it does on GitHub-hosted runners).
+    baseline_key = machine_key(baseline_data)
+    current_key = machine_key(current_data)
+    if baseline_key and current_key and baseline_key != current_key:
         print(
             f"ERROR: cross-machine comparison is invalid.\n"
-            f"  Baseline node: {baseline_node}\n"
-            f"  Current node:  {current_node}\n"
-            "Benchmarks must be run on the same machine for meaningful comparison.",
+            f"  Baseline machine: {baseline_key}\n"
+            f"  Current machine:  {current_key}\n"
+            "Benchmarks must be run on the same hardware for meaningful comparison.",
             file=sys.stderr,
         )
-        sys.exit(1)
+        sys.exit(NODE_MISMATCH_EXIT)
 
     # Build name → mean maps
     def build_map(data: dict) -> dict[str, float]:
@@ -66,11 +114,15 @@ def compare_json(baseline_file: str, current_file: str, tolerance: float) -> boo
     all_passed = True
     for name in all_names:
         if name not in baseline_map:
-            print(f"{name:<{col_w}} {'N/A':<13} {format_time(current_map[name]):<13} {'NEW':<13} ⚪ NEW")
+            print(
+                f"{name:<{col_w}} {'N/A':<13} {format_time(current_map[name]):<13} {'NEW':<13} ⚪ NEW"
+            )
             continue
 
         if name not in current_map:
-            print(f"{name:<{col_w}} {format_time(baseline_map[name]):<13} {'MISSING':<13} {'N/A':<13} ❌ MISSING")
+            print(
+                f"{name:<{col_w}} {format_time(baseline_map[name]):<13} {'MISSING':<13} {'N/A':<13} ❌ MISSING"
+            )
             all_passed = False
             continue
 
@@ -110,7 +162,9 @@ def main() -> None:
 
     if command == "compare-json":
         if len(sys.argv) < 4:
-            print("Usage: benchmark_compare.py compare-json <baseline-file> <current-file> [--tolerance=N]")
+            print(
+                "Usage: benchmark_compare.py compare-json <baseline-file> <current-file> [--tolerance=N]"
+            )
             sys.exit(1)
 
         baseline_file = sys.argv[2]

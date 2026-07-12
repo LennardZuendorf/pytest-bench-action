@@ -1,0 +1,30 @@
+# Pre-commit hooks for pytest-bench-action.
+#
+#   pip install pre-commit        # or: pipx install pre-commit
+#   pre-commit install            # enable the git commit hook
+#   pre-commit run --all-files    # run against the whole repo
+#
+# Ruff lints (--fix) and formats the Python helper scripts + tests; ty
+# type-checks them. Ruff config lives in ruff.toml, ty config in ty.toml.
+repos:
+  - repo: https://github.com/astral-sh/ruff-pre-commit
+    rev: v0.15.8
+    hooks:
+      - id: ruff-check
+        args: [--fix]
+      - id: ruff-format
+
+  # ty is installed from PyPI (not the standalone GitHub-release binary the
+  # official astral-sh/ty-pre-commit hook downloads) so the hook also works in
+  # locked-down CI that only permits the Python package index. The test deps are
+  # listed so ty can resolve `pytest` imports in the suite.
+  - repo: local
+    hooks:
+      - id: ty
+        name: ty (type check)
+        entry: ty check
+        language: python
+        additional_dependencies: ["ty==0.0.58", "pytest", "pytest-benchmark"]
+        types: [python]
+        pass_filenames: false
+        require_serial: true

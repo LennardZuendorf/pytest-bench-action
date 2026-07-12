@@ -7,8 +7,13 @@
 #   an actions/checkout step before it.
 # - contents:write is needed to commit baselines on push events;
 #   pull-requests:write is needed to post the PR comment.
-# - Baselines are tied to the runner's hostname (machine_info.node).
-#   Use a consistent runner (ideally self-hosted) for meaningful comparisons.
+# - Comparability is judged on the CPU fingerprint (machine_info.cpu), not the
+#   runner hostname, so hosted runners compare cleanly on the same CPU model.
+#   enforce-same-node: "false" (default) skips with a warning on a genuine
+#   hardware mismatch; "true" fails on one (use on a stable/self-hosted runner).
+# - To merge a PR with an intentional regression, add the "benchmark-override"
+#   label to it (configurable via override-label): the regression is still
+#   reported in the PR comment but does not fail the job.
 
 name: Benchmarks
 
@@ -40,11 +45,19 @@ jobs:
           cross-branch-tolerance: 20
           update-tolerance: 5
           threshold-map: '{"e2e_create": 30.0, "e2e_search": 5.0, "help": 0.5}'
+          # Compared on CPU fingerprint, not hostname: same CPU compares even
+          # with a fresh node name. "false" skips (don't fail) on a genuine
+          # hardware mismatch; "true" fails (use on a stable/self-hosted runner).
+          enforce-same-node: "false"
+          # PR label that waives a regression for a single PR (default shown).
+          override-label: benchmark-override
 
       # Outputs are available to later steps, e.g. for custom notifications:
       - name: Show outcome
         if: always()
         run: |
-          echo "regression-detected: ${{ steps.bench.outputs.regression-detected }}"
-          echo "baseline-updated:    ${{ steps.bench.outputs.baseline-updated }}"
-          echo "node:                ${{ steps.bench.outputs.node }}"
+          echo "regression-detected:   ${{ steps.bench.outputs.regression-detected }}"
+          echo "regression-overridden: ${{ steps.bench.outputs.regression-overridden }}"
+          echo "comparison-skipped:    ${{ steps.bench.outputs.comparison-skipped }}"
+          echo "baseline-updated:      ${{ steps.bench.outputs.baseline-updated }}"
+          echo "node:                  ${{ steps.bench.outputs.node }}"

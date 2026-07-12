@@ -4,7 +4,6 @@ import json
 from datetime import datetime
 
 import pytest
-
 from benchmark_baseline import sanitize_branch
 from conftest import make_results
 
@@ -29,7 +28,10 @@ class TestSanitizeBranch:
 class TestSave:
     def test_creates_baseline_file_with_sanitized_name(self, run_script, fixtures_dir, tmp_path):
         result = run_script(
-            SCRIPT, "save", "feature/my-thing", str(fixtures_dir / "results.json"),
+            SCRIPT,
+            "save",
+            "feature/my-thing",
+            str(fixtures_dir / "results.json"),
             f"--baselines-dir={tmp_path}",
         )
         assert result.returncode == 0
@@ -38,7 +40,10 @@ class TestSave:
 
     def test_strips_data_arrays(self, run_script, fixtures_dir, tmp_path):
         run_script(
-            SCRIPT, "save", "main", str(fixtures_dir / "results.json"),
+            SCRIPT,
+            "save",
+            "main",
+            str(fixtures_dir / "results.json"),
             f"--baselines-dir={tmp_path}",
         )
         saved = json.loads((tmp_path / "main.json").read_text())
@@ -48,7 +53,10 @@ class TestSave:
 
     def test_injects_baseline_info(self, run_script, fixtures_dir, tmp_path):
         run_script(
-            SCRIPT, "save", "feature/x", str(fixtures_dir / "results.json"),
+            SCRIPT,
+            "save",
+            "feature/x",
+            str(fixtures_dir / "results.json"),
             f"--baselines-dir={tmp_path}",
         )
         saved = json.loads((tmp_path / "feature_x.json").read_text())
@@ -67,7 +75,10 @@ class TestSave:
     def test_overwrite_is_idempotent(self, run_script, fixtures_dir, tmp_path):
         for _ in range(2):
             result = run_script(
-                SCRIPT, "save", "main", str(fixtures_dir / "results.json"),
+                SCRIPT,
+                "save",
+                "main",
+                str(fixtures_dir / "results.json"),
                 f"--baselines-dir={tmp_path}",
             )
             assert result.returncode == 0
@@ -86,7 +97,9 @@ class TestSave:
         assert loaded["benchmarks"][0]["name"] == "test_café_ωμέγα"
 
     def test_missing_results_file_exits_1(self, run_script, tmp_path):
-        result = run_script(SCRIPT, "save", "main", str(tmp_path / "nope.json"), f"--baselines-dir={tmp_path}")
+        result = run_script(
+            SCRIPT, "save", "main", str(tmp_path / "nope.json"), f"--baselines-dir={tmp_path}"
+        )
         assert result.returncode == 1
         assert "not found" in result.stderr
 
@@ -98,7 +111,10 @@ class TestSave:
 class TestLoad:
     def test_round_trip(self, run_script, fixtures_dir, tmp_path):
         run_script(
-            SCRIPT, "save", "feature/y", str(fixtures_dir / "results.json"),
+            SCRIPT,
+            "save",
+            "feature/y",
+            str(fixtures_dir / "results.json"),
             f"--baselines-dir={tmp_path}",
         )
         result = run_script(SCRIPT, "load", "feature/y", f"--baselines-dir={tmp_path}")
@@ -125,7 +141,10 @@ class TestList:
 
     def test_lists_saved_baselines(self, run_script, fixtures_dir, tmp_path):
         run_script(
-            SCRIPT, "save", "main", str(fixtures_dir / "results.json"),
+            SCRIPT,
+            "save",
+            "main",
+            str(fixtures_dir / "results.json"),
             f"--baselines-dir={tmp_path}",
         )
         result = run_script(SCRIPT, "list", str(tmp_path))
