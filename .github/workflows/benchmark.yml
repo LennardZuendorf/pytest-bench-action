@@ -4,10 +4,12 @@ name: Benchmark (self-test)
 # Proves action.yml runs end-to-end. Note: GitHub-hosted runners get a fresh
 # hostname per job, so cross-run baseline comparison here is best-effort — the
 # value is exercising the full step wiring, not stable numbers.
+#
+# PR-only trigger: baseline updates are staged as a commit on the PR branch
+# and land on main when the PR merges — no push trigger, no direct commit to
+# a (potentially rule-protected) main branch.
 
 on:
-  push:
-    branches: [main]
   pull_request:
 
 permissions:
