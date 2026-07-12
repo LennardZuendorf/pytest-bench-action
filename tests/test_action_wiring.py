@@ -66,7 +66,10 @@ class TestSaveBaselineForTargetBranch:
         )
         assert block, "step block not found"
         text = block.group(0)
-        assert "if: github.event_name == 'pull_request' && steps.check-update.outputs.should_update == 'true'" in text
+        assert (
+            "if: github.event_name == 'pull_request' && steps.check-update.outputs.should_update == 'true'"
+            in text
+        )
         assert 'benchmark_baseline.py" save' in text
         assert '"${{ github.base_ref }}"' in text
 
@@ -97,13 +100,15 @@ class TestBaselineCommitLandsOnPRBranch:
 class TestBaselineUpdatedOutputGate:
     def test_gated_on_same_repo_pull_request(self, action_text):
         assert (
-            'SAME_REPO_PR="${{ github.event_name == \'pull_request\' && '
+            "SAME_REPO_PR=\"${{ github.event_name == 'pull_request' && "
             'github.event.pull_request.head.repo.full_name == github.repository }}"'
         ) in action_text
         assert '[ "${UPDATE}" = "true" ] && [ "${SAME_REPO_PR}" = "true" ]' in action_text
 
     def test_old_push_gate_removed(self, action_text):
-        assert '[ "${{ github.event_name }}" = "push" ] && [ "${UPDATE}" = "true" ]' not in action_text
+        assert (
+            '[ "${{ github.event_name }}" = "push" ] && [ "${UPDATE}" = "true" ]' not in action_text
+        )
 
 
 class TestForkAwareBaselineNote:
