@@ -55,6 +55,22 @@ class TestCheckUpdateAgainstTargetBaseline:
         assert "steps.load-main-baseline.outputs.main_baseline_path" in block
 
 
+class TestSaveBaselineForTargetBranch:
+    def test_step_present(self, action_text):
+        assert "- name: Save baseline for target branch (PR only)" in action_text
+
+    def test_step_gated_and_uses_base_ref(self, action_text):
+        block = re.search(
+            r"- name: Save baseline for target branch \(PR only\)\n(?:.*\n)+?\n    - name:",
+            action_text,
+        )
+        assert block, "step block not found"
+        text = block.group(0)
+        assert "if: github.event_name == 'pull_request' && steps.check-update.outputs.should_update == 'true'" in text
+        assert 'benchmark_baseline.py" save' in text
+        assert '"${{ github.base_ref }}"' in text
+
+
 class TestNewInputs:
     def test_enforce_same_node_declared(self, action_text):
         assert re.search(r"^\s{2}enforce-same-node:$", action_text, re.MULTILINE)

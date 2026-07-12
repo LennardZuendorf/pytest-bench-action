@@ -287,6 +287,16 @@ runs:
           "${{ inputs.benchmark-results-file }}" \
           --baselines-dir="${{ inputs.baselines-dir }}"
 
+    - name: Save baseline for target branch (PR only)
+      if: github.event_name == 'pull_request' && steps.check-update.outputs.should_update == 'true'
+      shell: bash
+      run: |
+        SCRIPT_DIR="${{ github.action_path }}/scripts"
+        python "${SCRIPT_DIR}/benchmark_baseline.py" save \
+          "${{ github.base_ref }}" \
+          "${{ inputs.benchmark-results-file }}" \
+          --baselines-dir="${{ inputs.baselines-dir }}"
+
     - name: Commit baseline (push events only)
       if: github.event_name == 'push' && steps.check-update.outputs.should_update == 'true'
       uses: EndBug/add-and-commit@v9
