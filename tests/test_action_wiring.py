@@ -37,6 +37,24 @@ class TestCheckoutRefForPRs:
         ) in action_text
 
 
+class TestCheckUpdateAgainstTargetBaseline:
+    def _step_block(self, action_text):
+        block = re.search(
+            r"- name: Check whether baseline needs updating\n(?:.*\n)+?\n    - name:",
+            action_text,
+        )
+        assert block, "step block not found"
+        return block.group(0)
+
+    def test_gated_on_pull_request(self, action_text):
+        assert "if: github.event_name == 'pull_request'" in self._step_block(action_text)
+
+    def test_compares_against_main_baseline_path(self, action_text):
+        block = self._step_block(action_text)
+        assert "steps.load-main-baseline.outputs.main_baseline_exists" in block
+        assert "steps.load-main-baseline.outputs.main_baseline_path" in block
+
+
 class TestNewInputs:
     def test_enforce_same_node_declared(self, action_text):
         assert re.search(r"^\s{2}enforce-same-node:$", action_text, re.MULTILINE)

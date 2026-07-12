@@ -255,19 +255,18 @@ runs:
         fi
 
     - name: Check whether baseline needs updating
+      if: github.event_name == 'pull_request'
       shell: bash
       id: check-update
       run: |
         SCRIPT_DIR="${{ github.action_path }}/scripts"
-        SANITIZED="${{ steps.branch.outputs.sanitized_branch }}"
-        BASELINE_FILE="${{ inputs.baselines-dir }}/${SANITIZED}.json"
 
-        if [ ! -f "${BASELINE_FILE}" ]; then
+        if [ "${{ steps.load-main-baseline.outputs.main_baseline_exists }}" != "true" ]; then
           echo "should_update=true" >> "$GITHUB_OUTPUT"
-          echo "No existing baseline — will create."
+          echo "No existing baseline for '${{ github.base_ref }}' — will create."
         else
           if python "${SCRIPT_DIR}/benchmark_compare.py" compare-json \
-            "${BASELINE_FILE}" \
+            "${{ steps.load-main-baseline.outputs.main_baseline_path }}" \
             "${{ inputs.benchmark-results-file }}" \
             --tolerance="${{ inputs.update-tolerance }}" \
             > /dev/null 2>&1; then
