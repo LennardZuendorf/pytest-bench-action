@@ -1,10 +1,10 @@
-name: pytest-bench-action
-description: Run pytest-benchmark, manage per-branch baselines, and post PR comparison comments.
+name: pytest Benchmark Baseline Check
+description: Regression-gate your pytest-benchmark suite with per-branch baselines, PR comparison comments, and a one-label override for intentional slowdowns.
 author: lennardzuendorf
 
 branding:
-  icon: activity
-  color: purple
+  icon: zap
+  color: orange
 
 inputs:
   python-version:

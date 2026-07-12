@@ -1,6 +1,10 @@
 # pytest-bench-action
 
+<img src="docs/assets/icon.png" alt="pytest Benchmark Baseline Check icon" width="96" align="right" />
+
 A reusable GitHub Action that runs `pytest-benchmark`, manages per-branch baselines committed to your repository, compares results against those baselines, and posts a formatted summary comment on every PR.
+
+> Not affiliated with, endorsed by, or sponsored by the Python Software Foundation or the pytest / pytest-benchmark maintainers — an independent, third-party tool.
 
 ## Usage
 
